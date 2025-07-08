@@ -1,37 +1,37 @@
 # Fintech Remittance App - Development Roadmap
 
-## Phase 1: Foundation & Core Infrastructure ⚡ ✅ COMPLETED
+## Phase 1: Foundation & Core Infrastructure ⚡ (PRIORITY)
 
 ### 1.1 Project Setup & Configuration
-- [x] Initialize monorepo structure (frontend + backend)
-- [x] Set up TypeScript configurations
-- [x] Configure ESLint + Prettier
-- [x] Set up basic testing framework (Jest)
-- [x] Create environment configuration files
-- [x] Set up basic package.json scripts
+- [ ] Initialize monorepo structure (frontend + backend)
+- [ ] Set up TypeScript configurations
+- [ ] Configure ESLint + Prettier
+- [ ] Set up basic testing framework (Jest)
+- [ ] Create environment configuration files
+- [ ] Set up basic package.json scripts
 
 ### 1.2 Database Foundation
-- [x] Set up PostgreSQL with Prisma
-- [x] Create basic User model
-- [x] Set up database migrations
-- [x] Configure separate dev/staging/prod databases
-- [x] Test database connection
+- [ ] Set up PostgreSQL with Prisma
+- [ ] Create basic User model
+- [ ] Set up database migrations
+- [ ] Configure separate dev/staging/prod databases
+- [ ] Test database connection
 
 ### 1.3 Backend Core Authentication
-- [x] Basic Express server setup
-- [x] JWT authentication middleware
-- [x] User registration endpoint
-- [x] User login endpoint
-- [x] Password hashing with bcrypt
-- [x] Basic error handling middleware
+- [ ] Basic Express server setup
+- [ ] JWT authentication middleware
+- [ ] User registration endpoint
+- [ ] User login endpoint
+- [ ] Password hashing with bcrypt
+- [ ] Basic error handling middleware
 
 ### 1.4 Frontend Core Setup
-- [x] Expo app initialization
-- [x] React Navigation setup
-- [x] Basic screen structure (Login, Register, Dashboard)
-- [x] Zustand store setup
-- [x] expo-secure-store configuration
-- [x] Basic UI components (Button, Input, Layout)
+- [ ] Expo app initialization
+- [ ] React Navigation setup
+- [ ] Basic screen structure (Login, Register, Dashboard)
+- [ ] Zustand store setup
+- [ ] expo-secure-store configuration
+- [ ] Basic UI components (Button, Input, Layout)
 
 ## Phase 2: Authentication & Security 🔐
 
@@ -181,36 +181,19 @@
 ## Current Status Tracker
 
 ### ✅ Completed Features
-- **Phase 1: Foundation & Core Infrastructure** ✅
-  - Monorepo structure with frontend and backend
-  - TypeScript configuration across all projects
-  - ESLint + Prettier setup
-  - Jest testing framework configuration
-  - Environment configuration files
-  - PostgreSQL database with Prisma ORM
-  - Basic User model with authentication
-  - Express server with JWT authentication
-  - Expo app with React Navigation
-  - Zustand state management
-  - Basic UI components (Button, Input, Layout)
-  - Login, Register, and Dashboard screens
+*This section will be updated as development progresses*
 
 ### 🚧 Currently Working On
-*Ready for Phase 2 - Authentication & Security*
+*Update this section with current development focus*
 
 ### 🔄 In Progress
-*No items currently in progress*
+*Track ongoing development items*
 
 ### ❌ Blocked Items
-*No blocked items*
+*Track items that are blocked and why*
 
 ### 📋 Next Priority Items
-**Phase 2: Authentication & Security** 🔐
-1. Multi-Factor Authentication (TOTP setup)
-2. Enhanced Security (Rate limiting, validation)
-3. Biometric Authentication (expo-local-authentication)
-4. Password reset flow
-5. Session management improvements
+*List the next 3-5 items to focus on*
 
 ---
 

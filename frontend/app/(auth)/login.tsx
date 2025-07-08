@@ -1,36 +1,30 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import Layout from '../components/ui/Layout';
-import SimpleInput from '../components/ui/SimpleInput';
-import Button from '../components/ui/Button';
-import useAuthStore from '../store/authStore';
-import { AuthStackParamList } from '../navigation/types';
+import { Link, router } from 'expo-router';
+import { useAuthStore } from '../../lib/auth';
+import { validateEmail, validatePassword, sanitizeInput } from '../../utils/validation';
+import SimpleInput from '../../components/ui/SimpleInput';
+import Button from '../../components/ui/Button';
+import type { ValidationError, ApiError } from '../../types';
 
-type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'>;
-
-interface LoginScreenProps {
-  navigation: LoginScreenNavigationProp;
-}
-
-const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
+export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const { login, isLoading, error, clearError } = useAuthStore();
 
   const validateForm = (): boolean => {
-    const newErrors: { email?: string; password?: string } = {};
+    const newErrors: Record<string, string> = {};
     
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      newErrors.email = emailValidation.errors[0].message;
     }
     
-    if (!password.trim()) {
-      newErrors.password = 'Password is required';
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      newErrors.password = passwordValidation.errors[0].message;
     }
     
     setErrors(newErrors);
@@ -43,18 +37,32 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     clearError();
     
     try {
-      await login(email.trim(), password);
+      await login({
+        email: sanitizeInput(email.trim()),
+        password: password,
+      });
+      
+      // Navigation is handled by the auth state change
+      router.replace('/(dashboard)');
     } catch (error) {
-      Alert.alert('Login Failed', error instanceof Error ? error.message : 'An error occurred');
+      const apiError = error as ApiError;
+      
+      // Handle validation errors from server
+      if (apiError.details && Array.isArray(apiError.details)) {
+        const serverErrors: Record<string, string> = {};
+        apiError.details.forEach((detail: ValidationError) => {
+          serverErrors[detail.field] = detail.message;
+        });
+        setErrors(serverErrors);
+      } else {
+        Alert.alert('Login Failed', apiError.message || 'An error occurred');
+      }
     }
   };
 
-  const handleNavigateToRegister = () => {
-    navigation.navigate('Register');
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: '#ffffff', flex: 1 }]}>
+    <View style={styles.container}>
+      <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
@@ -100,17 +108,23 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Don't have an account?{' '}
-            <Text style={styles.linkText} onPress={handleNavigateToRegister}>
+            <Link href="/(auth)/register" style={styles.linkText}>
               Sign up
-            </Text>
+            </Link>
           </Text>
         </View>
+      </View>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingTop: 50,
+  },
+  content: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
@@ -154,5 +168,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default LoginScreen;

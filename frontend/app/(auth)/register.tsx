@@ -1,58 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import Layout from '../components/ui/Layout';
-import SimpleInput from '../components/ui/SimpleInput';
-import Button from '../components/ui/Button';
-import useAuthStore from '../store/authStore';
-import { AuthStackParamList } from '../navigation/types';
+import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
+import { Link, router } from 'expo-router';
+import { useAuthStore } from '../../lib/auth';
+import { validateEmail, validatePassword, validateName, validatePhone, sanitizeInput } from '../../utils/validation';
+import SimpleInput from '../../components/ui/SimpleInput';
+import Button from '../../components/ui/Button';
+import type { RegisterData, ValidationError, ApiError } from '../../types';
 
-type RegisterScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Register'>;
-
-interface RegisterScreenProps {
-  navigation: RegisterScreenNavigationProp;
-}
-
-const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
-  const [formData, setFormData] = useState({
+export default function RegisterScreen() {
+  const [formData, setFormData] = useState<RegisterData>({
     firstName: '',
     lastName: '',
     email: '',
-    phone: '',
     password: '',
-    confirmPassword: '',
+    phone: '',
   });
-  
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const { register, isLoading, error, clearError } = useAuthStore();
 
   const validateForm = (): boolean => {
-    const newErrors: { [key: string]: string } = {};
+    const newErrors: Record<string, string> = {};
     
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
+    const firstNameValidation = validateName(formData.firstName, 'firstName');
+    if (!firstNameValidation.isValid) {
+      newErrors.firstName = firstNameValidation.errors[0].message;
     }
     
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
+    const lastNameValidation = validateName(formData.lastName, 'lastName');
+    if (!lastNameValidation.isValid) {
+      newErrors.lastName = lastNameValidation.errors[0].message;
     }
     
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
+    const emailValidation = validateEmail(formData.email);
+    if (!emailValidation.isValid) {
+      newErrors.email = emailValidation.errors[0].message;
     }
     
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
+    const phoneValidation = validatePhone(formData.phone || '');
+    if (!phoneValidation.isValid) {
+      newErrors.phone = phoneValidation.errors[0].message;
     }
     
-    if (!formData.confirmPassword.trim()) {
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.isValid) {
+      newErrors.password = passwordValidation.errors[0].message;
+    }
+    
+    if (!confirmPassword.trim()) {
       newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
+    } else if (formData.password !== confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
     
@@ -66,23 +64,35 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
     clearError();
     
     try {
-      await register({
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        email: formData.email.trim(),
+      const sanitizedData: RegisterData = {
+        firstName: sanitizeInput(formData.firstName.trim()),
+        lastName: sanitizeInput(formData.lastName.trim()),
+        email: sanitizeInput(formData.email.trim()),
         password: formData.password,
-        phone: formData.phone.trim() || undefined,
-      });
+        phone: formData.phone ? sanitizeInput(formData.phone.trim()) : undefined,
+      };
+
+      await register(sanitizedData);
+      
+      // Navigation is handled by the auth state change
+      router.replace('/(dashboard)');
     } catch (error) {
-      Alert.alert('Registration Failed', error instanceof Error ? error.message : 'An error occurred');
+      const apiError = error as ApiError;
+      
+      // Handle validation errors from server
+      if (apiError.details && Array.isArray(apiError.details)) {
+        const serverErrors: Record<string, string> = {};
+        apiError.details.forEach((detail: ValidationError) => {
+          serverErrors[detail.field] = detail.message;
+        });
+        setErrors(serverErrors);
+      } else {
+        Alert.alert('Registration Failed', apiError.message || 'An error occurred');
+      }
     }
   };
 
-  const handleNavigateToLogin = () => {
-    navigation.navigate('Login');
-  };
-
-  const updateFormData = (field: string, value: string) => {
+  const updateFormData = (field: keyof RegisterData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -90,7 +100,12 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#ffffff', flex: 1 }]}>
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Join us to start sending money</Text>
@@ -131,7 +146,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
 
           <SimpleInput
             label="Phone"
-            value={formData.phone}
+            value={formData.phone || ''}
             onChangeText={(value) => updateFormData('phone', value)}
             placeholder="Enter your phone number"
             keyboardType="phone-pad"
@@ -152,8 +167,13 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
 
           <SimpleInput
             label="Confirm Password"
-            value={formData.confirmPassword}
-            onChangeText={(value) => updateFormData('confirmPassword', value)}
+            value={confirmPassword}
+            onChangeText={(value) => {
+              setConfirmPassword(value);
+              if (errors.confirmPassword) {
+                setErrors(prev => ({ ...prev, confirmPassword: '' }));
+              }
+            }}
             placeholder="Confirm your password"
             secureTextEntry
             autoCapitalize="none"
@@ -176,18 +196,27 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Already have an account?{' '}
-            <Text style={styles.linkText} onPress={handleNavigateToLogin}>
+            <Link href="/(auth)/login" style={styles.linkText}>
               Sign in
-            </Text>
+            </Link>
           </Text>
         </View>
+      </ScrollView>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#ffffff',
+    paddingTop: 50,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 32,
@@ -231,5 +260,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-export default RegisterScreen;

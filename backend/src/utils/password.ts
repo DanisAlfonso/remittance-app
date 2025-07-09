@@ -18,8 +18,18 @@ export function validatePassword(password: string): {
 } {
   const errors: string[] = [];
   
+  // Handle null/undefined input
+  if (!password) {
+    errors.push('Password is required');
+    return { isValid: false, errors };
+  }
+  
   if (password.length < 8) {
     errors.push('Password must be at least 8 characters long');
+  }
+  
+  if (password.length > 128) {
+    errors.push('Password must be no more than 128 characters long');
   }
   
   if (!/[A-Z]/.test(password)) {

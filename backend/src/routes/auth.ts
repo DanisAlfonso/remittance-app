@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, RequestHandler } from 'express';
 import { prisma } from '../config/database';
 import { hashPassword, comparePassword, validatePassword } from '../utils/password';
 import { generateToken } from '../middleware/auth';
@@ -20,16 +20,17 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
-router.post('/register', async (req: Request, res: Response) => {
+const registerHandler: RequestHandler = async (req: Request, res: Response) => {
   try {
     const validatedData = registerSchema.parse(req.body);
     
     const passwordValidation = validatePassword(validatedData.password);
     if (!passwordValidation.isValid) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Password validation failed',
         details: passwordValidation.errors,
       });
+      return;
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -37,10 +38,11 @@ router.post('/register', async (req: Request, res: Response) => {
     });
 
     if (existingUser) {
-      return res.status(409).json({
+      res.status(409).json({
         error: 'User already exists',
         message: 'An account with this email already exists',
       });
+      return;
     }
 
     const hashedPassword = await hashPassword(validatedData.password);
@@ -95,13 +97,14 @@ router.post('/register', async (req: Request, res: Response) => {
     console.error('Error details:', JSON.stringify(error, null, 2));
     
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation error',
         details: error.errors.map(e => ({
           field: e.path.join('.'),
           message: e.message,
         })),
       });
+      return;
     }
 
     res.status(500).json({
@@ -110,9 +113,9 @@ router.post('/register', async (req: Request, res: Response) => {
       details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-});
+};
 
-router.post('/login', async (req: Request, res: Response) => {
+const loginHandler: RequestHandler = async (req: Request, res: Response) => {
   try {
     const validatedData = loginSchema.parse(req.body);
 
@@ -121,26 +124,29 @@ router.post('/login', async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Invalid credentials',
         message: 'Invalid email or password',
       });
+      return;
     }
 
     if (!user.isActive) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Account deactivated',
         message: 'Your account has been deactivated',
       });
+      return;
     }
 
     const isPasswordValid = await comparePassword(validatedData.password, user.password);
 
     if (!isPasswordValid) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Invalid credentials',
         message: 'Invalid email or password',
       });
+      return;
     }
 
     await prisma.session.deleteMany({
@@ -189,13 +195,14 @@ router.post('/login', async (req: Request, res: Response) => {
     console.error('Login error:', error);
     
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation error',
         details: error.errors.map(e => ({
           field: e.path.join('.'),
           message: e.message,
         })),
       });
+      return;
     }
 
     res.status(500).json({
@@ -203,6 +210,10 @@ router.post('/login', async (req: Request, res: Response) => {
       message: 'An error occurred during login',
     });
   }
-});
+};
+
+// Register routes
+router.post('/register', registerHandler);
+router.post('/login', loginHandler);
 
 export default router;

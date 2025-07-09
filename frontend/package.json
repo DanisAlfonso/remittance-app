@@ -8,6 +8,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build": "expo export",
+    "lint": "eslint app/ components/ lib/ types/ utils/ --ext .ts,.tsx",
+    "lint:fix": "eslint app/ components/ lib/ types/ utils/ --ext .ts,.tsx --fix",
+    "typecheck": "tsc --noEmit",
     "test": "echo 'Frontend tests not yet configured. Run backend tests with: npm run test:backend'"
   },
   "dependencies": {
@@ -27,6 +31,11 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
+    "@typescript-eslint/eslint-plugin": "^8.36.0",
+    "@typescript-eslint/parser": "^8.36.0",
+    "eslint": "^9.30.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-native": "^5.0.0",
     "typescript": "~5.8.3"
   },
   "private": true

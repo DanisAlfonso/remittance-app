@@ -32,7 +32,9 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
     
     clearError();
     
@@ -107,7 +109,7 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/(auth)/register" style={styles.linkText}>
               Sign up
             </Link>

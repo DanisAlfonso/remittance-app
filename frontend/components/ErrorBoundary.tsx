@@ -59,7 +59,7 @@ export default class ErrorBoundary extends React.Component<Props, ErrorBoundaryS
             <Text style={styles.title}>Something went wrong</Text>
             
             <Text style={styles.message}>
-              We're sorry, but something unexpected happened. Please try restarting the app.
+              We&apos;re sorry, but something unexpected happened. Please try restarting the app.
             </Text>
             
             {__DEV__ && this.state.error && (

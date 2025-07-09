@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React from 'react';
 import { Redirect, Stack } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
 

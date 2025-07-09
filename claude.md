@@ -99,6 +99,82 @@ remittance-app/
 - `POST /api/v1/auth/login` - User login
 - `GET /health` - Health check endpoint
 
+## Development Standards & Quality Assurance
+
+### 🎯 **MANDATORY WORKFLOW FOR ALL CODE CHANGES**
+
+**After ANY code modification, creation, or generation, Claude Code MUST:**
+
+1. **Code Quality Check**:
+   ```bash
+   npm run lint        # Fix all linting issues
+   npm run typecheck   # Ensure no TypeScript errors
+   npm run build       # Verify successful compilation
+   ```
+
+2. **Test Verification**:
+   ```bash
+   npm test           # Run ALL tests - must be 100% passing
+   ```
+
+3. **New Functionality Requirements**:
+   - Write comprehensive unit tests for ALL new functions/features
+   - Achieve 100% test coverage for critical paths
+   - Include edge cases and error scenarios
+   - Follow existing test patterns and mocking strategies
+
+### 🎨 **UI/UX EXCELLENCE STANDARDS**
+
+**For ALL UI-related code, ensure:**
+
+- **Modern Design**: Clean, professional, contemporary aesthetics
+- **Perfect Typography**: Consistent font sizes, weights, spacing
+- **Color Harmony**: Professional color palette with proper contrast
+- **Responsive Layout**: Flawless on all screen sizes and orientations
+- **Smooth Animations**: 60fps transitions and micro-interactions
+- **Accessibility**: WCAG 2.1 AA compliance, screen reader support
+- **Loading States**: Elegant loading indicators and skeleton screens
+- **Error Handling**: Beautiful error states with helpful messaging
+- **Consistent Spacing**: Perfect margins, padding, and alignment
+- **Professional Polish**: Every pixel matters - pixel-perfect implementation
+
+### 📏 **Code Quality Standards**
+
+- **Perfect Formatting**: Consistent indentation, line breaks, spacing
+- **TypeScript Strict**: Full type safety, no `any` types
+- **ESLint Clean**: Zero warnings or errors
+- **Performance**: Optimized for speed and memory usage
+- **Security**: Follow fintech security best practices
+- **Documentation**: Clear comments for complex logic
+- **Naming**: Descriptive, consistent variable/function names
+
+### ⚡ **Quality Gates - ALL MUST PASS**
+
+Before considering any task complete:
+
+```bash
+# 1. Code Quality
+npm run lint && npm run typecheck && npm run build
+
+# 2. Test Suite
+npm test
+
+# 3. Verify Output
+# ✅ 0 ESLint errors/warnings
+# ✅ 0 TypeScript errors  
+# ✅ Successful build
+# ✅ All tests passing (52/52 or more)
+```
+
+### 🚀 **Testing Philosophy**
+
+- **Test Everything**: Every function, component, API endpoint
+- **Test-Driven Development**: Write tests first when possible
+- **Comprehensive Coverage**: Happy path, edge cases, error scenarios
+- **Realistic Testing**: Use proper mocks that mirror real behavior
+- **Fast & Reliable**: Tests should run quickly and consistently
+- **Maintainable**: Tests should be easy to update when code changes
+
 ## Development Commands
 
 ### Root Level

@@ -150,7 +150,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       validateSession: async (): Promise<boolean> => {
         try {
           const token = get().token;
-          if (!token) return false;
+          if (!token) {
+            return false;
+          }
 
           // Call a protected endpoint to validate token
           await apiClient.get('/auth/validate', {

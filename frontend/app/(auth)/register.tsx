@@ -59,7 +59,9 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
     
     clearError();
     

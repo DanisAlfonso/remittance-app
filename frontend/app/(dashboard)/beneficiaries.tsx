@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import Button from '../../components/ui/Button';
 
 interface Beneficiary {

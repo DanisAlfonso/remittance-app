@@ -94,7 +94,7 @@ class ApiClient {
 
   async post<T>(
     endpoint: string,
-    data?: any,
+    data?: unknown,
     options: RequestInit = {}
   ): Promise<T> {
     return this.request<T>(endpoint, {
@@ -106,7 +106,7 @@ class ApiClient {
 
   async put<T>(
     endpoint: string,
-    data?: any,
+    data?: unknown,
     options: RequestInit = {}
   ): Promise<T> {
     return this.request<T>(endpoint, {

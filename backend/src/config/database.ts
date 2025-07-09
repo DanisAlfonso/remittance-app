@@ -3,7 +3,6 @@ import { PrismaClient } from '../generated/prisma';
 let prisma: PrismaClient;
 
 declare global {
-  // eslint-disable-next-line no-var
   var __prisma: PrismaClient | undefined;
 }
 
@@ -20,7 +19,7 @@ if (process.env.NODE_ENV === 'production') {
 
 export { prisma };
 
-export async function connectDatabase() {
+export async function connectDatabase(): Promise<void> {
   try {
     await prisma.$connect();
     console.log('Database connected successfully');
@@ -30,7 +29,7 @@ export async function connectDatabase() {
   }
 }
 
-export async function disconnectDatabase() {
+export async function disconnectDatabase(): Promise<void> {
   try {
     await prisma.$disconnect();
     console.log('Database disconnected successfully');

@@ -23,12 +23,12 @@ export default function RegisterScreen() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
-    const firstNameValidation = validateName(formData.firstName, 'firstName');
+    const firstNameValidation = validateName(formData.firstName, 'First name');
     if (!firstNameValidation.isValid) {
       newErrors.firstName = firstNameValidation.errors[0].message;
     }
     
-    const lastNameValidation = validateName(formData.lastName, 'lastName');
+    const lastNameValidation = validateName(formData.lastName, 'Last name');
     if (!lastNameValidation.isValid) {
       newErrors.lastName = lastNameValidation.errors[0].message;
     }
@@ -165,6 +165,7 @@ export default function RegisterScreen() {
             autoCapitalize="none"
             error={errors.password}
             required
+            testID="password"
           />
 
           <SimpleInput
@@ -181,6 +182,7 @@ export default function RegisterScreen() {
             autoCapitalize="none"
             error={errors.confirmPassword}
             required
+            testID="confirmPassword"
           />
 
           <Button

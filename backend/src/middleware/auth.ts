@@ -33,7 +33,7 @@ export function generateToken(userId: string, email: string, sessionId: string):
 export function verifyToken(token: string): JWTPayload {
   try {
     return jwt.verify(token, env.JWT_SECRET) as JWTPayload;
-  } catch (error) {
+  } catch {
     throw new Error('Invalid token');
   }
 }
@@ -131,7 +131,7 @@ export async function optionalAuth(
     }
 
     next();
-  } catch (error) {
+  } catch {
     next();
   }
 }

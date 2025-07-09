@@ -11,7 +11,7 @@ export function validateEmail(email: string): ValidationResult {
   if (!email.trim()) {
     errors.push({ field: 'email', message: 'Email is required' });
   } else if (!/\S+@\S+\.\S+/.test(email)) {
-    errors.push({ field: 'email', message: 'Please enter a valid email' });
+    errors.push({ field: 'email', message: 'Please enter a valid email address' });
   }
   
   return {

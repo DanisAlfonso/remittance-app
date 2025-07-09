@@ -12,14 +12,13 @@ process.env.DATABASE_URL = 'prisma+postgres://localhost:51213/?api_key=test-db-k
 jest.setTimeout(10000);
 
 // Mock console methods in tests to reduce noise
-const originalConsole = global.console;
 global.console = {
   ...console,
   log: jest.fn(),
   info: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
-} as any;
+} as unknown as Console;
 
 // Clean up after each test
 afterEach(() => {

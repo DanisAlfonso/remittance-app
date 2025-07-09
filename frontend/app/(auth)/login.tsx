@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
-import { validateEmail, validatePassword, sanitizeInput } from '../../utils/validation';
+import { validateEmail, sanitizeInput } from '../../utils/validation';
 import SimpleInput from '../../components/ui/SimpleInput';
 import Button from '../../components/ui/Button';
 import type { ValidationError, ApiError } from '../../types';
@@ -11,6 +11,20 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const updateEmail = (value: string) => {
+    setEmail(value);
+    if (errors.email) {
+      setErrors(prev => ({ ...prev, email: '' }));
+    }
+  };
+  
+  const updatePassword = (value: string) => {
+    setPassword(value);
+    if (errors.password) {
+      setErrors(prev => ({ ...prev, password: '' }));
+    }
+  };
   
   const { login, isLoading, error, clearError } = useAuthStore();
 
@@ -22,9 +36,10 @@ export default function LoginScreen() {
       newErrors.email = emailValidation.errors[0].message;
     }
     
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      newErrors.password = passwordValidation.errors[0].message;
+    if (!password.trim()) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
     }
     
     setErrors(newErrors);
@@ -74,7 +89,7 @@ export default function LoginScreen() {
           <SimpleInput
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={updateEmail}
             placeholder="Enter your email"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -86,13 +101,14 @@ export default function LoginScreen() {
           <SimpleInput
             label="Password"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={updatePassword}
             placeholder="Enter your password"
             secureTextEntry
             autoCapitalize="none"
             autoComplete="password"
             error={errors.password}
             required
+            testID="password"
           />
 
           <Button

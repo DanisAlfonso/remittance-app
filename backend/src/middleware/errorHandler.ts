@@ -4,14 +4,14 @@ import { isDevelopment } from '../config/environment';
 
 export interface ApiError extends Error {
   statusCode?: number;
-  details?: any;
+  details?: unknown;
 }
 
 export class CustomError extends Error {
   public statusCode: number;
-  public details?: any;
+  public details?: unknown;
 
-  constructor(message: string, statusCode: number = 500, details?: any) {
+  constructor(message: string, statusCode: number = 500, details?: unknown) {
     super(message);
     this.statusCode = statusCode;
     this.details = details;
@@ -19,7 +19,7 @@ export class CustomError extends Error {
   }
 }
 
-export function createError(message: string, statusCode: number = 500, details?: any): CustomError {
+export function createError(message: string, statusCode: number = 500, details?: unknown): CustomError {
   return new CustomError(message, statusCode, details);
 }
 
@@ -27,7 +27,7 @@ export function errorHandler(
   err: ApiError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction // eslint-disable-line @typescript-eslint/no-unused-vars
 ): void {
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
@@ -66,7 +66,13 @@ export function errorHandler(
     timestamp: new Date().toISOString(),
   });
 
-  const response: any = {
+  const response: {
+    error: string;
+    statusCode: number;
+    timestamp: string;
+    details?: unknown;
+    stack?: string;
+  } = {
     error: message,
     statusCode,
     timestamp: new Date().toISOString(),
@@ -93,9 +99,9 @@ export function notFoundHandler(req: Request, res: Response): void {
 }
 
 export function asyncHandler<T extends Request, U extends Response>(
-  fn: (req: T, res: U, next: NextFunction) => Promise<any>
+  fn: (req: T, res: U, next: NextFunction) => Promise<unknown>
 ) {
-  return (req: T, res: U, next: NextFunction) => {
+  return (req: T, res: U, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }

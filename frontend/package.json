@@ -7,7 +7,8 @@
     "dev": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "echo 'Frontend tests not yet configured. Run backend tests with: npm run test:backend'"
   },
   "dependencies": {
     "expo": "53.0.19",

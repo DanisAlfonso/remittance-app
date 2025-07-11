@@ -5,8 +5,6 @@ config({ path: '.env.test' });
 
 // Set test environment
 process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';
-process.env.DATABASE_URL = 'prisma+postgres://localhost:51213/?api_key=test-db-key';
 
 // Global test timeout
 jest.setTimeout(10000);

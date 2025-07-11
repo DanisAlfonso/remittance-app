@@ -58,6 +58,16 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         try {
           const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
           
+          // Check if this is a different user than previously stored
+          const storedUserString = await SecureStore.getItemAsync(USER_KEY);
+          if (storedUserString) {
+            const storedUser = JSON.parse(storedUserString);
+            if (storedUser.id !== response.user.id) {
+              // Different user - clear wallet data
+              await SecureStore.deleteItemAsync('wallet-storage');
+            }
+          }
+          
           await SecureStore.setItemAsync(TOKEN_KEY, response.token);
           await SecureStore.setItemAsync(USER_KEY, JSON.stringify(response.user));
 
@@ -84,6 +94,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         try {
           const response = await apiClient.post<AuthResponse>('/auth/register', userData);
 
+          // Clear any existing wallet data for new registration
+          await SecureStore.deleteItemAsync('wallet-storage');
+          
           await SecureStore.setItemAsync(TOKEN_KEY, response.token);
           await SecureStore.setItemAsync(USER_KEY, JSON.stringify(response.user));
 
@@ -108,6 +121,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         try {
           await SecureStore.deleteItemAsync(TOKEN_KEY);
           await SecureStore.deleteItemAsync(USER_KEY);
+          // Clear wallet data on logout
+          await SecureStore.deleteItemAsync('wallet-storage');
         } catch (error) {
           console.error('Error clearing stored auth:', error);
         }
@@ -127,6 +142,23 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
           if (token && userString) {
             const user = JSON.parse(userString);
+            
+            // Check if wallet data belongs to a different user
+            const walletStorageString = await SecureStore.getItemAsync('wallet-storage');
+            if (walletStorageString) {
+              try {
+                const walletData = JSON.parse(walletStorageString);
+                if (walletData.state && walletData.state.userId && walletData.state.userId !== user.id) {
+                  // Different user - clear wallet data
+                  console.log('Clearing wallet data for user change:', walletData.state.userId, '->', user.id);
+                  await SecureStore.deleteItemAsync('wallet-storage');
+                }
+              } catch (walletError) {
+                console.error('Error parsing wallet data:', walletError);
+                // Clear corrupted wallet data
+                await SecureStore.deleteItemAsync('wallet-storage');
+              }
+            }
             
             // Validate token is still valid
             const isValid = await get().validateSession();

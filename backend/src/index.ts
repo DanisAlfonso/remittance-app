@@ -5,6 +5,8 @@ import morgan from 'morgan';
 import { env } from './config/environment';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth';
+import wiseRoutes from './routes/wise';
+import transferRoutes from './routes/transfer';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -36,6 +38,8 @@ app.get('/api/v1/health', (req, res) => {
 });
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/wise', wiseRoutes);
+app.use('/api/v1/transfer', transferRoutes);
 
 app.use((req, res, next) => {
   notFoundHandler(req, res);
@@ -58,6 +62,9 @@ async function startServer() {
   }
 }
 
-startServer();
+// Only start the server if we're not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
 
 export default app;

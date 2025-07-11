@@ -1,4 +1,4 @@
-import { hashPassword, comparePassword, validatePassword } from '../../utils/password';
+import { hashPassword, comparePassword, validatePassword } from '../../../utils/password';
 
 describe('Password Utilities', () => {
   describe('validatePassword', () => {

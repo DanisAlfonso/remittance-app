@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
-import { generateToken, verifyToken, JWTPayload } from '../../middleware/auth';
+import { generateToken, verifyToken, JWTPayload } from '../../../middleware/auth';
 
 // Mock environment before importing
-jest.mock('../../config/environment', () => ({
+jest.mock('../../../config/environment', () => ({
   env: {
     JWT_SECRET: 'test-jwt-secret-key-for-testing-only',
     JWT_EXPIRES_IN: '24h',

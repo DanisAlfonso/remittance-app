@@ -20,24 +20,24 @@ const mockValidatePassword = jest.fn().mockReturnValue({ isValid: true, errors: 
 const mockGenerateToken = jest.fn().mockReturnValue('mock-jwt-token');
 
 // Mock database
-jest.mock('../../config/database', () => ({
+jest.mock('../../../config/database', () => ({
   prisma: mockPrisma,
 }));
 
 // Mock password utilities
-jest.mock('../../utils/password', () => ({
+jest.mock('../../../utils/password', () => ({
   hashPassword: mockHashPassword,
   comparePassword: mockComparePassword,
   validatePassword: mockValidatePassword,
 }));
 
 // Mock JWT
-jest.mock('../../middleware/auth', () => ({
+jest.mock('../../../middleware/auth', () => ({
   generateToken: mockGenerateToken,
 }));
 
 // Now import the router
-import authRouter from '../../routes/auth';
+import authRouter from '../../../routes/auth';
 
 describe('Authentication Routes', () => {
   let app: express.Application;
@@ -161,7 +161,7 @@ describe('Authentication Routes', () => {
 
     it('should reject weak passwords', async () => {
       // Mock password validation to reject
-      const { validatePassword } = require('../../utils/password');
+      const { validatePassword } = require('../../../utils/password');
       validatePassword.mockReturnValue({
         isValid: false,
         errors: ['Password must contain at least one special character']
@@ -254,7 +254,7 @@ describe('Authentication Routes', () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       
       // Mock password comparison
-      const { comparePassword } = require('../../utils/password');
+      const { comparePassword } = require('../../../utils/password');
       comparePassword.mockResolvedValue(true);
       
       // Mock session cleanup and creation
@@ -299,7 +299,7 @@ describe('Authentication Routes', () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       
       // Mock password comparison fails
-      const { comparePassword } = require('../../utils/password');
+      const { comparePassword } = require('../../../utils/password');
       comparePassword.mockResolvedValue(false);
 
       const response = await request(app)
@@ -343,7 +343,7 @@ describe('Authentication Routes', () => {
     it('should clean up old sessions on login', async () => {
       // Mock user exists and password is valid
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      const { comparePassword } = require('../../utils/password');
+      const { comparePassword } = require('../../../utils/password');
       comparePassword.mockResolvedValue(true);
       
       // Mock session operations

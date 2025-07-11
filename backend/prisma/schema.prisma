@@ -41,6 +41,7 @@ model User {
   sessions    Session[]
   transactions Transaction[]
   beneficiaries Beneficiary[]
+  wiseAccounts WiseAccount[]
   
   @@map("users")
 }
@@ -152,4 +153,105 @@ enum TransactionStatus {
   FAILED
   CANCELLED
   REFUNDED
+}
+
+model WiseAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  
+  // Wise account details
+  wiseAccountId Int      @unique
+  wiseProfileId Int
+  currency      String   @db.VarChar(3)
+  country       String   @db.VarChar(2)
+  accountType   String   // SAVINGS, CHECKING
+  name          String
+  status        String   @default("ACTIVE")
+  
+  // Account identifiers
+  iban          String?
+  accountNumber String?
+  sortCode      String?
+  routingNumber String?
+  bic           String?
+  
+  // Bank information
+  bankName      String?
+  bankAddress   String?
+  
+  // OAuth tokens
+  accessToken   String?
+  refreshToken  String?
+  tokenExpiresAt DateTime?
+  
+  // Balance cache
+  lastBalance   Decimal? @db.Decimal(10, 2)
+  balanceUpdatedAt DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WiseTransaction[]
+  
+  @@map("wise_accounts")
+}
+
+model WiseTransaction {
+  id              String   @id @default(cuid())
+  wiseAccountId   String
+  
+  // Wise transaction details
+  wiseTransactionId Int?
+  type            String   // DEPOSIT, WITHDRAWAL, TRANSFER, FEE
+  status          String   @default("PENDING")
+  amount          Decimal  @db.Decimal(10, 2)
+  currency        String   @db.VarChar(3)
+  
+  // Exchange details
+  exchangeRate    Decimal? @db.Decimal(10, 6)
+  targetAmount    Decimal? @db.Decimal(10, 2)
+  targetCurrency  String?  @db.VarChar(3)
+  
+  // Fees
+  fee             Decimal? @db.Decimal(10, 2)
+  
+  // Reference
+  reference       String?
+  description     String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+  
+  // Relations
+  wiseAccount WiseAccount @relation(fields: [wiseAccountId], references: [id], onDelete: Cascade)
+  
+  @@map("wise_transactions")
+}
+
+enum WiseAccountStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  CLOSED
+}
+
+enum WiseTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  FEE
+  EXCHANGE
+}
+
+enum WiseTransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
 }

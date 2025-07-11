@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../lib/auth';
 import { apiClient } from '../lib/api';
 import ErrorBoundary from '../components/ErrorBoundary';

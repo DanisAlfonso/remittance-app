@@ -1,107 +1,143 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
-
-interface Transaction {
-  id: string;
-  type: 'send' | 'receive';
-  amount: number;
-  currency: string;
-  recipient: string;
-  date: string;
-  status: 'completed' | 'pending' | 'failed';
-}
-
-// Mock data for demo
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    type: 'send',
-    amount: 500.00,
-    currency: 'USD',
-    recipient: 'John Smith',
-    date: '2024-01-15',
-    status: 'completed',
-  },
-  {
-    id: '2',
-    type: 'send',
-    amount: 250.00,
-    currency: 'USD',
-    recipient: 'Maria Garcia',
-    date: '2024-01-14',
-    status: 'pending',
-  },
-  {
-    id: '3',
-    type: 'receive',
-    amount: 100.00,
-    currency: 'USD',
-    recipient: 'David Wilson',
-    date: '2024-01-13',
-    status: 'completed',
-  },
-];
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { transferService } from '../../lib/transfer';
+import type { Transfer } from '../../types/transfer';
 
 export default function TransactionsScreen() {
-  const getStatusColor = (status: Transaction['status']) => {
-    switch (status) {
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadTransfers();
+  }, []);
+
+  const loadTransfers = async () => {
+    try {
+      setError(null);
+      const response = await transferService.getTransferHistory(50, 0); // Load more transactions
+      setTransfers(response.transfers);
+    } catch (error: unknown) {
+      console.error('Failed to load transfers:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load transactions');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadTransfers();
+    setIsRefreshing(false);
+  };
+
+  const calculateSummary = () => {
+    let totalSent = 0;
+    let totalReceived = 0;
+
+    transfers.forEach((transfer) => {
+      if (transfer.sourceAmount > 0) {
+        // Incoming transfer (positive amount)
+        totalReceived += transfer.sourceAmount;
+      } else {
+        // Outgoing transfer (negative amount) - add absolute value to totalSent
+        totalSent += Math.abs(transfer.sourceAmount);
+      }
+    });
+
+    return { totalSent, totalReceived };
+  };
+
+  const getTransferType = (transfer: Transfer): 'send' | 'receive' => {
+    // If sourceAmount is positive, it's an incoming transfer (deposit)
+    // If sourceAmount is negative, it's an outgoing transfer
+    return transfer.sourceAmount > 0 ? 'receive' : 'send';
+  };
+
+  const getRecipientName = (transfer: Transfer): string => {
+    if (getTransferType(transfer) === 'receive') {
+      // For incoming transfers, try to extract sender info from description
+      if (transfer.description?.includes('Transfer from')) {
+        return transfer.description.replace('Transfer from ', '') || 'Another user';
+      }
+      return 'Another user';
+    }
+    // For outgoing transfers, use recipient info
+    return transfer.recipient?.name || transfer.description || 'Unknown recipient';
+  };
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
       case 'completed':
         return '#28a745';
       case 'pending':
         return '#ffc107';
+      case 'processing':
+      case 'sent':
+        return '#17a2b8';
       case 'failed':
+      case 'cancelled':
         return '#dc3545';
       default:
         return '#6c757d';
     }
   };
 
-  const getStatusText = (status: Transaction['status']) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+  const getStatusText = (status: string) => {
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 
-  const renderTransaction = ({ item }: { item: Transaction }) => (
-    <View style={styles.transactionCard}>
-      <View style={styles.transactionHeader}>
-        <View style={styles.transactionInfo}>
-          <Text style={styles.transactionType}>
-            {item.type === 'send' ? '↗️ Sent to' : '↙️ Received from'}
-          </Text>
-          <Text style={styles.recipientName}>{item.recipient}</Text>
+  const renderTransaction = ({ item }: { item: Transfer }) => {
+    const transferType = getTransferType(item);
+    const recipientName = getRecipientName(item);
+    // Use absolute value of sourceAmount since incoming transfers are already positive
+    // and outgoing transfers are negative but we want to show them as positive with - sign
+    const amount = Math.abs(item.sourceAmount);
+    const currency = item.sourceCurrency;
+    
+    return (
+      <View style={styles.transactionCard}>
+        <View style={styles.transactionHeader}>
+          <View style={styles.transactionInfo}>
+            <Text style={styles.transactionType}>
+              {transferType === 'send' ? '↗️ Sent to' : '↙️ Received from'}
+            </Text>
+            <Text style={styles.recipientName}>{recipientName}</Text>
+          </View>
+          <View style={styles.amountContainer}>
+            <Text style={[
+              styles.amount,
+              { color: transferType === 'send' ? '#dc3545' : '#28a745' }
+            ]}>
+              {transferType === 'send' ? '-' : '+'}${amount.toFixed(2)}
+            </Text>
+            <Text style={styles.currency}>{currency}</Text>
+          </View>
         </View>
-        <View style={styles.amountContainer}>
-          <Text style={[
-            styles.amount,
-            { color: item.type === 'send' ? '#dc3545' : '#28a745' }
-          ]}>
-            {item.type === 'send' ? '-' : '+'}${item.amount.toFixed(2)}
+        
+        <View style={styles.transactionFooter}>
+          <Text style={styles.date}>
+            {new Date(item.createdAt).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })}
           </Text>
-          <Text style={styles.currency}>{item.currency}</Text>
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: getStatusColor(item.status.status) + '20' }
+          ]}>
+            <Text style={[
+              styles.statusText,
+              { color: getStatusColor(item.status.status) }
+            ]}>
+              {getStatusText(item.status.status)}
+            </Text>
+          </View>
         </View>
       </View>
-      
-      <View style={styles.transactionFooter}>
-        <Text style={styles.date}>
-          {new Date(item.date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-          })}
-        </Text>
-        <View style={[
-          styles.statusBadge,
-          { backgroundColor: getStatusColor(item.status) + '20' }
-        ]}>
-          <Text style={[
-            styles.statusText,
-            { color: getStatusColor(item.status) }
-          ]}>
-            {getStatusText(item.status)}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -115,11 +151,11 @@ export default function TransactionsScreen() {
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Total Sent</Text>
-            <Text style={styles.summaryValue}>$750.00</Text>
+            <Text style={styles.summaryValue}>${calculateSummary().totalSent.toFixed(2)}</Text>
           </View>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Total Received</Text>
-            <Text style={styles.summaryValue}>$100.00</Text>
+            <Text style={styles.summaryValue}>${calculateSummary().totalReceived.toFixed(2)}</Text>
           </View>
         </View>
       </View>
@@ -127,13 +163,29 @@ export default function TransactionsScreen() {
       <View style={styles.transactionsContainer}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
         
-        {mockTransactions.length > 0 ? (
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>Loading transactions...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : transfers.length > 0 ? (
           <FlatList
-            data={mockTransactions}
+            data={transfers}
             renderItem={renderTransaction}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.transactionsList}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                colors={['#007AFF']}
+              />
+            }
           />
         ) : (
           <View style={styles.emptyState}>
@@ -293,6 +345,26 @@ const styles = StyleSheet.create({
   emptyStateSubtext: {
     fontSize: 14,
     color: '#9ca3af',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6c757d',
+    marginTop: 12,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#dc3545',
     textAlign: 'center',
   },
 });

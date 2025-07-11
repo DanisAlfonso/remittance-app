@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
 import { wiseService } from '../../lib/wise';
+import { transferService } from '../../lib/transfer';
 import Button from '../../components/ui/Button';
+import type { Transfer } from '../../types/transfer';
 
 export default function DashboardScreen() {
   const { user, logout } = useAuthStore();
@@ -13,17 +14,46 @@ export default function DashboardScreen() {
     accounts, 
     selectedAccount, 
     balance, 
-    isLoading, 
-    error, 
     isInitialized,
     userId,
     loadAccounts, 
     selectAccount,
     refreshBalance,
-    clearError,
-    reset,
     setUserId 
   } = useWalletStore();
+  
+  const [recentTransfers, setRecentTransfers] = useState<Transfer[]>([]);
+  const [isLoadingTransfers, setIsLoadingTransfers] = useState(false);
+
+  const loadRecentTransfers = async () => {
+    if (!user) {
+      return;
+    }
+    
+    setIsLoadingTransfers(true);
+    try {
+      const response = await transferService.getTransferHistory(3, 0); // Load last 3 transfers
+      setRecentTransfers(response.transfers);
+    } catch (error) {
+      console.error('Failed to load recent transfers:', error);
+    } finally {
+      setIsLoadingTransfers(false);
+    }
+  };
+
+  const getTransferType = (transfer: Transfer): 'send' | 'receive' => {
+    return transfer.sourceAmount > 0 ? 'receive' : 'send';
+  };
+
+  const getRecipientName = (transfer: Transfer): string => {
+    if (getTransferType(transfer) === 'receive') {
+      if (transfer.description?.includes('Transfer from')) {
+        return transfer.description.replace('Transfer from ', '') || 'Another user';
+      }
+      return 'Another user';
+    }
+    return transfer.recipient?.name || transfer.description || 'Unknown recipient';
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -77,12 +107,26 @@ export default function DashboardScreen() {
     }
   }, [selectedAccount, balance, refreshBalance]);
 
+  // Refresh recent transfers when balance updates (in case new transfers were made)
+  useEffect(() => {
+    if (balance && user && isInitialized) {
+      loadRecentTransfers();
+    }
+  }, [balance?.updatedAt, user, isInitialized]);
+
   // Auto-select first account if no account is selected but accounts exist
   useEffect(() => {
     if (accounts.length > 0 && !selectedAccount) {
       selectAccount(accounts[0].id);
     }
   }, [accounts, selectedAccount, selectAccount]);
+
+  // Load recent transfers when user is available
+  useEffect(() => {
+    if (user && isInitialized) {
+      loadRecentTransfers();
+    }
+  }, [user, isInitialized]);
 
   if (!user) {
     return (
@@ -120,29 +164,6 @@ export default function DashboardScreen() {
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActions}>
-            <Button
-              title="Send Money"
-              onPress={() => router.push('/(dashboard)/send-money')}
-              style={styles.actionButton}
-            />
-            <Button
-              title="Add Beneficiary"
-              onPress={() => console.log('Add Beneficiary')}
-              style={styles.actionButton}
-              testID="add-beneficiary-button"
-            />
-            <Button
-              title="View Transactions"
-              onPress={() => console.log('View Transactions')}
-              style={styles.actionButton}
-              testID="view-transactions-button"
-            />
-          </View>
         </View>
 
         {/* Total Balance Section - Wise Style - Only show when user has created accounts */}
@@ -230,30 +251,6 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {__DEV__ && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Debug Actions</Text>
-            <Text style={styles.debugInfo}>
-              Current User: {user?.email} (ID: {user?.id})
-            </Text>
-            <Text style={styles.debugInfo}>
-              Wallet User ID: {userId || 'null'}
-            </Text>
-            <Text style={styles.debugInfo}>
-              Accounts: {accounts.length}, Selected: {selectedAccount?.id || 'none'}
-            </Text>
-            <Button
-              title="Clear All Cache Data"
-              onPress={async () => {
-                reset();
-                await SecureStore.deleteItemAsync('wallet-storage');
-                console.log('Cache cleared - please restart app');
-              }}
-              variant="outline"
-              style={styles.debugButton}
-            />
-          </View>
-        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Status</Text>
@@ -274,11 +271,62 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <View style={styles.activityGroup}>
-            <Text style={styles.emptyStateTitle}>No recent activity</Text>
-            <Text style={styles.emptyStateText}>Your transaction history will appear here</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            {recentTransfers.length > 0 && (
+              <TouchableOpacity
+                onPress={() => router.push('/(dashboard)/transactions')}
+                style={styles.viewAllButton}
+              >
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            )}
           </View>
+          
+          {isLoadingTransfers ? (
+            <View style={styles.activityGroup}>
+              <Text style={styles.emptyStateText}>Loading recent activity...</Text>
+            </View>
+          ) : recentTransfers.length > 0 ? (
+            <View style={styles.activityList}>
+              {recentTransfers.map((transfer) => {
+                const transferType = getTransferType(transfer);
+                const recipientName = getRecipientName(transfer);
+                const amount = Math.abs(transfer.sourceAmount);
+                
+                return (
+                  <View key={transfer.id} style={styles.activityItem}>
+                    <View style={styles.activityInfo}>
+                      <Text style={styles.activityType}>
+                        {transferType === 'send' ? '↗️ Sent to' : '↙️ Received from'}
+                      </Text>
+                      <Text style={styles.activityRecipient}>{recipientName}</Text>
+                      <Text style={styles.activityDate}>
+                        {new Date(transfer.createdAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                    <View style={styles.activityAmount}>
+                      <Text style={[
+                        styles.activityAmountText,
+                        { color: transferType === 'send' ? '#dc3545' : '#28a745' }
+                      ]}>
+                        {transferType === 'send' ? '-' : '+'}${amount.toFixed(2)}
+                      </Text>
+                      <Text style={styles.activityCurrency}>{transfer.sourceCurrency}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.activityGroup}>
+              <Text style={styles.emptyStateTitle}>No recent activity</Text>
+              <Text style={styles.emptyStateText}>Your transaction history will appear here</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -484,12 +532,6 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginBottom: 16,
   },
-  quickActions: {
-    gap: 12,
-  },
-  actionButton: {
-    marginBottom: 8,
-  },
   overviewGroup: {
     gap: 16,
   },
@@ -602,14 +644,69 @@ const styles = StyleSheet.create({
   },
   detailsButton: {
     marginTop: 12,
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  debugButton: {
-    marginTop: 8,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  debugInfo: {
+  viewAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'transparent',
+    borderRadius: 8,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  activityList: {
+    gap: 12,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+  },
+  activityInfo: {
+    flex: 1,
+  },
+  activityType: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginBottom: 2,
+  },
+  activityRecipient: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 2,
+  },
+  activityDate: {
     fontSize: 12,
     color: '#6c757d',
-    marginBottom: 4,
-    fontFamily: 'monospace',
+  },
+  activityAmount: {
+    alignItems: 'flex-end',
+  },
+  activityAmountText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  activityCurrency: {
+    fontSize: 12,
+    color: '#6c757d',
   },
 });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useWalletStore } from '../../lib/walletStore';
 import { transferService } from '../../lib/transfer';
@@ -11,6 +12,7 @@ import type { TransferQuote } from '../../types/transfer';
 
 export default function SendMoneyScreen() {
   const { accounts, selectedAccount, balance } = useWalletStore();
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<'amount' | 'recipient' | 'quote' | 'confirm' | 'processing'>('amount');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -402,7 +404,7 @@ export default function SendMoneyScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {step === 'processing' ? (
         <TransferProcessing
           amount={transferService.formatAmount(parseFloat(amount), selectedAccount?.currency || 'EUR')}
@@ -422,7 +424,7 @@ export default function SendMoneyScreen() {
             {step === 'quote' && renderQuoteStep()}
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 4) }]}>
             <Button
               title="Cancel"
               onPress={() => router.back()}
@@ -432,7 +434,7 @@ export default function SendMoneyScreen() {
           </View>
         </>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -440,7 +442,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
-    paddingTop: 50,
   },
   scrollView: {
     flex: 1,
@@ -500,15 +501,23 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '30%',
     marginBottom: 8,
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   countryGrid: {
     gap: 8,
   },
   countryButton: {
     marginBottom: 8,
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   selectedButton: {
     backgroundColor: '#007AFF',
+    shadowOpacity: 0.1,
+    elevation: 2,
   },
   actionButton: {
     marginTop: 24,
@@ -580,10 +589,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   footer: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 6,
     alignItems: 'center',
+    backgroundColor: '#ffffff',
   },
   cancelButton: {
-    width: '50%',
+    width: '45%',
+    height: 48,
+    backgroundColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
+import { transferService } from '../../lib/transfer';
 
 interface TransferProcessingProps {
   amount: string;
   currency: string;
   recipientName: string;
+  transferId?: string;
   onComplete: () => void;
 }
 
@@ -12,33 +14,39 @@ const TransferProcessing: React.FC<TransferProcessingProps> = ({
   amount,
   currency,
   recipientName,
+  transferId,
   onComplete,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.8));
   const [progressAnim] = useState(new Animated.Value(0));
+  const [useRealStatusUpdates] = useState(!!transferId);
 
   const steps = [
     { 
       title: 'Initiating Transfer...', 
-      description: 'Validating account details',
-      duration: 1000 
+      description: 'Creating quote and validating recipient details',
+      duration: 1500,
+      wiseStatus: 'processing'
     },
     { 
-      title: 'Processing Payment...', 
-      description: 'Connecting to banking network',
-      duration: 2000 
+      title: 'Converting Currency...', 
+      description: 'Processing exchange and calculating fees',
+      duration: 2000,
+      wiseStatus: 'funds_converted'
     },
     { 
-      title: 'Sending Money...', 
-      description: 'Transfer in progress',
-      duration: 2000 
+      title: 'Sending Payment...', 
+      description: 'Transfer sent to recipient bank',
+      duration: 2500,
+      wiseStatus: 'outgoing_payment_sent'
     },
     { 
       title: 'Transfer Complete!', 
-      description: 'Money sent successfully',
-      duration: 1000 
+      description: 'Money successfully delivered',
+      duration: 1500,
+      wiseStatus: 'incoming_payment_sent'
     },
   ];
 
@@ -58,7 +66,63 @@ const TransferProcessing: React.FC<TransferProcessingProps> = ({
       }),
     ]).start();
 
-    // Progress through steps
+    if (useRealStatusUpdates && transferId) {
+      // Use real Wise API status simulation for enhanced realism
+      console.log('🎯 Using real transfer status simulation');
+      simulateRealTransferProgress();
+    } else {
+      // Fallback to mock progression
+      console.log('🎭 Using mock transfer progression');
+      simulateMockTransferProgress();
+    }
+  }, []);
+
+  const simulateRealTransferProgress = async () => {
+    if (!transferId) {
+      return;
+    }
+    
+    try {
+      let stepIndex = 0;
+      
+      for (const step of steps) {
+        setCurrentStep(stepIndex);
+        
+        // Animate progress bar
+        Animated.timing(progressAnim, {
+          toValue: (stepIndex + 1) / steps.length,
+          duration: step.duration,
+          useNativeDriver: false,
+        }).start();
+
+        // Simulate real Wise status update
+        if (stepIndex < steps.length - 1) {
+          try {
+            await transferService.simulateTransferStatus(transferId, step.wiseStatus);
+            console.log(`✅ Status updated to: ${step.wiseStatus}`);
+          } catch (error) {
+            console.warn('Status simulation failed:', error);
+          }
+        }
+
+        // Wait for step duration
+        await new Promise(resolve => setTimeout(resolve, step.duration));
+        stepIndex++;
+      }
+      
+      // Complete the transfer
+      setTimeout(() => {
+        onComplete();
+      }, 500);
+      
+    } catch (error) {
+      console.error('Real transfer simulation error:', error);
+      // Fallback to mock simulation
+      simulateMockTransferProgress();
+    }
+  };
+
+  const simulateMockTransferProgress = () => {
     let stepIndex = 0;
     const stepTimer = setInterval(() => {
       if (stepIndex < steps.length) {
@@ -80,9 +144,7 @@ const TransferProcessing: React.FC<TransferProcessingProps> = ({
         }, 500);
       }
     }, 100);
-
-    return () => clearInterval(stepTimer);
-  }, []);
+  };
 
   const getCurrentStepProgress = () => {
     const totalSteps = steps.length;

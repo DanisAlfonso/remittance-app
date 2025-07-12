@@ -16,6 +16,7 @@ interface EnvironmentConfig {
   WISE_CLIENT_ID: string;
   WISE_CLIENT_SECRET: string;
   WISE_REDIRECT_URI: string;
+  WISE_WEBHOOK_SECRET: string;
 }
 
 const requiredEnvVars = [
@@ -44,6 +45,7 @@ function validateEnvironment(): EnvironmentConfig {
     WISE_CLIENT_ID: process.env.WISE_CLIENT_ID || 'sandbox-client-id',
     WISE_CLIENT_SECRET: process.env.WISE_CLIENT_SECRET || 'sandbox-client-secret',
     WISE_REDIRECT_URI: process.env.WISE_REDIRECT_URI || 'my-app://callback',
+    WISE_WEBHOOK_SECRET: process.env.WISE_WEBHOOK_SECRET || 'sandbox-webhook-secret',
   };
 }
 

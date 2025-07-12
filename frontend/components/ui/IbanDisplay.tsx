@@ -6,7 +6,7 @@ interface IbanDisplayProps {
   iban: string;
   accountName: string;
   currency: string;
-  style?: any;
+  style?: object;
 }
 
 export default function IbanDisplay({ iban, accountName, currency, style }: IbanDisplayProps) {
@@ -26,7 +26,7 @@ export default function IbanDisplay({ iban, accountName, currency, style }: Iban
         'The IBAN has been copied to your clipboard',
         [{ text: 'OK' }]
       );
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to copy IBAN');
     } finally {
       setIsLoading(false);

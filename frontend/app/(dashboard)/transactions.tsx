@@ -57,29 +57,69 @@ export default function TransactionsScreen() {
 
   const getRecipientName = (transfer: Transfer): string => {
     if (getTransferType(transfer) === 'receive') {
-      // For incoming transfers, try to extract sender info from description
+      // For incoming transfers, try to extract sender name from description
       if (transfer.description?.includes('Transfer from')) {
-        return transfer.description.replace('Transfer from ', '') || 'Another user';
+        const senderName = transfer.description.replace('Transfer from ', '').trim();
+        return senderName || 'App user';
       }
-      return 'Another user';
+      // Try to get from reference field
+      if (transfer.reference?.includes('Transfer from')) {
+        const senderName = transfer.reference.replace('Transfer from ', '').trim();
+        return senderName || 'App user';
+      }
+      return 'App user';
     }
-    // For outgoing transfers, use recipient info
-    return transfer.recipient?.name || transfer.description || 'Unknown recipient';
+    
+    // For outgoing transfers, show recipient name
+    if (transfer.recipient?.name) {
+      return transfer.recipient.name;
+    }
+    
+    // Fallback to extracting from reference
+    if (transfer.reference?.includes('Transfer to')) {
+      const recipientName = transfer.reference.replace('Transfer to ', '').trim();
+      return recipientName || 'Recipient';
+    }
+    
+    return 'Recipient';
+  };
+
+  const getTransferDescription = (transfer: Transfer): string => {
+    const transferType = getTransferType(transfer);
+    
+    if (transferType === 'receive') {
+      // For incoming transfers
+      if (transfer.sourceCurrency === transfer.targetCurrency) {
+        return 'Money received';
+      } else {
+        return `${transfer.sourceCurrency} to ${transfer.targetCurrency} conversion`;
+      }
+    } else {
+      // For outgoing transfers
+      if (transfer.recipient?.bankName) {
+        return `Transfer to ${transfer.recipient.bankName}`;
+      }
+      if (transfer.sourceCurrency === transfer.targetCurrency) {
+        return 'Money sent';
+      } else {
+        return `${transfer.sourceCurrency} to ${transfer.targetCurrency} transfer`;
+      }
+    }
   };
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'completed':
-        return '#28a745';
+        return '#059669'; // Professional green
       case 'pending':
-        return '#ffc107';
+        return '#d97706'; // Professional amber
       case 'processing':
       case 'sent':
-        return '#17a2b8';
+        return '#0284c7'; // Professional blue
       case 'failed':
       case 'cancelled':
-        return '#dc3545';
+        return '#dc2626'; // Subtle red
       default:
-        return '#6c757d';
+        return '#6b7280'; // Professional gray
     }
   };
 
@@ -100,14 +140,17 @@ export default function TransactionsScreen() {
         <View style={styles.transactionHeader}>
           <View style={styles.transactionInfo}>
             <Text style={styles.transactionType}>
-              {transferType === 'send' ? '↗️ Sent to' : '↙️ Received from'}
+              {transferType === 'send' ? 'Sent to' : 'Received from'}
             </Text>
             <Text style={styles.recipientName}>{recipientName}</Text>
+            <Text style={styles.transactionDescription}>
+              {getTransferDescription(item)}
+            </Text>
           </View>
           <View style={styles.amountContainer}>
             <Text style={[
               styles.amount,
-              { color: transferType === 'send' ? '#dc3545' : '#28a745' }
+              { color: transferType === 'send' ? '#6b7280' : '#059669' }
             ]}>
               {transferType === 'send' ? '-' : '+'}${amount.toFixed(2)}
             </Text>
@@ -300,6 +343,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333333',
+    marginBottom: 2,
+  },
+  transactionDescription: {
+    fontSize: 13,
+    color: '#6c757d',
+    fontStyle: 'italic',
+    marginBottom: 4,
   },
   amountContainer: {
     alignItems: 'flex-end',

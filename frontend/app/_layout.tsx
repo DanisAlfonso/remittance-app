@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../lib/auth';
 import { apiClient } from '../lib/api';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -35,14 +34,6 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
-        <Stack.Screen 
-          name="modal" 
-          options={{ 
-            presentation: 'modal',
-            headerShown: true,
-            title: 'Modal',
-          }} 
-        />
       </Stack>
       <StatusBar style="auto" />
     </ErrorBoundary>

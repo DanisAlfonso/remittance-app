@@ -80,7 +80,27 @@ export class TransferService {
     const response = await apiClient.get<{ 
       transfers: Transfer[]; 
       pagination: { limit: number; offset: number; total: number } 
-    }>(`/transfer/history?limit=${limit}&offset=${offset}`);
+    }>(`/wise/transfers?limit=${limit}&offset=${offset}`);
+    return response;
+  }
+
+  /**
+   * Simulate transfer status change (sandbox development)
+   */
+  async simulateTransferStatus(transferId: string, status: string): Promise<{
+    message: string;
+    transferId: string;
+    newStatus: string;
+    wiseStatus: string;
+    timestamp: string;
+  }> {
+    const response = await apiClient.post<{
+      message: string;
+      transferId: string;
+      newStatus: string;
+      wiseStatus: string;
+      timestamp: string;
+    }>(`/wise/transfers/${transferId}/simulate-status`, { status });
     return response;
   }
 

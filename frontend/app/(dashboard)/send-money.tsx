@@ -1,604 +1,714 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useWalletStore } from '../../lib/walletStore';
-import { transferService } from '../../lib/transfer';
-import { wiseService } from '../../lib/wise';
-import Button from '../../components/ui/Button';
-import SimpleInput from '../../components/ui/SimpleInput';
-import TransferProcessing from '../../components/ui/TransferProcessing';
-import type { TransferQuote } from '../../types/transfer';
+import { useAuthStore } from '../../lib/auth';
+import { apiClient } from '../../lib/api';
+
+type FlowStep = 'recipients' | 'currency' | 'method' | 'amount' | 'processing';
+
+interface Recipient {
+  id: string;
+  name: string;
+  email?: string;
+  iban?: string;
+  currency: string;
+  country: string;
+  lastUsed: string;
+}
 
 export default function SendMoneyScreen() {
-  const { accounts, selectedAccount, balance } = useWalletStore();
-  const insets = useSafeAreaInsets();
-  const [step, setStep] = useState<'amount' | 'recipient' | 'quote' | 'confirm' | 'processing'>('amount');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Form data
-  const [amount, setAmount] = useState('');
-  const [targetCurrency, setTargetCurrency] = useState('EUR');
-  const [targetCountry, setTargetCountry] = useState('DE');
-  const [recipientIban, setRecipientIban] = useState('');
-  const [recipientName, setRecipientName] = useState('');
-  const [reference, setReference] = useState('');
-  const [description, setDescription] = useState('');
-
-  // Quote data
-  const [quote, setQuote] = useState<TransferQuote | null>(null);
-
-  const currencies = wiseService.getSupportedCurrencies();
-  const countries = wiseService.getSupportedCountries();
+  const { selectedAccount } = useWalletStore();
+  const { user, token } = useAuthStore();
+  const [step, setStep] = useState<FlowStep>('recipients');
+  const [selectedCurrency, setSelectedCurrency] = useState<'EUR' | 'HNL' | null>(null);
+  const [recentRecipients, setRecentRecipients] = useState<Recipient[]>([]);
+  const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
 
   useEffect(() => {
     if (!selectedAccount) {
       Alert.alert('No Account Selected', 'Please select an account first', [
         { text: 'OK', onPress: () => router.back() }
       ]);
+    } else {
+      loadRecentRecipients();
     }
   }, [selectedAccount]);
 
-  const validateAmount = (): boolean => {
-    const numAmount = parseFloat(amount);
-    const currentBalance = balance?.amount || 0;
-    
-    const validation = transferService.validateAmount(numAmount, currentBalance);
-    if (!validation.isValid) {
-      setError(validation.error || 'Invalid amount');
-      return false;
+  const loadRecentRecipients = async () => {
+    if (!user || !token) {
+      return;
     }
     
-    setError(null);
-    return true;
-  };
-
-  const validateRecipient = (): boolean => {
-    if (!recipientName.trim()) {
-      setError('Recipient name is required');
-      return false;
-    }
-    
-    if (!recipientIban.trim()) {
-      setError('IBAN is required');
-      return false;
-    }
-    
-    const ibanValidation = transferService.validateIban(recipientIban);
-    if (!ibanValidation.isValid) {
-      setError(ibanValidation.error || 'Invalid IBAN');
-      return false;
-    }
-    
-    setError(null);
-    return true;
-  };
-
-  const handleGetQuote = async () => {
-    if (!validateAmount() || !selectedAccount) {return;}
-
-    setIsLoading(true);
-    setError(null);
-
+    setIsLoadingRecipients(true);
     try {
-      const quoteResponse = await transferService.getQuote(
-        selectedAccount.id,
-        targetCurrency,
-        targetCountry,
-        parseFloat(amount),
-        selectedAccount.currency
-      );
-
-      setQuote(quoteResponse.quote);
-      setStep('recipient');
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'Failed to get quote');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleShowQuote = () => {
-    if (!validateRecipient()) {return;}
-    setStep('quote');
-  };
-
-  const handleConfirmTransfer = async () => {
-    if (!selectedAccount) {return;}
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Start the elegant processing animation
-      setStep('processing');
-
-      // Create transfer with actual amount
-      const transferResponse = await transferService.createSimpleTransfer({
-        recipientAccount: {
-          accountNumber: recipientIban.trim(),
-          currency: targetCurrency,
-          country: targetCountry,
-        },
-        recipientDetails: {
-          firstName: recipientName.trim().split(' ')[0] || 'Recipient',
-          lastName: recipientName.trim().split(' ').slice(1).join(' ') || 'User',
-          email: `${recipientName.trim().toLowerCase().replace(/\s+/g, '.').replace(/^\.+|\.+$/g, '')}@example.com`, // Temporary
-        },
-        transferDetails: {
-          amount: parseFloat(amount),
-          currency: selectedAccount.currency,
-          reference: reference.trim() || undefined,
-        },
+      // Fetch user's transfer history from wise transfers
+      const response = await apiClient.get('/wise/transfers', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      // The processing animation will handle the success state
-      console.log('Transfer created:', transferResponse.transfer);
-    } catch (error: unknown) {
-      console.error('Transfer creation error:', error);
-      let errorMessage = 'Failed to create transfer';
       
-      // Handle API errors properly
-      if (error && typeof error === 'object' && 'message' in error) {
-        const apiError = error as { message: string; error?: string; details?: { message: string }[] };
-        
-        // Check if it's a validation error from the backend
-        if (apiError.error === 'Validation error' || apiError.message.includes('required')) {
-          errorMessage = 'Please check all required fields are filled correctly';
-          if (apiError.details && Array.isArray(apiError.details)) {
-            // Show specific validation errors
-            const validationErrors = apiError.details.map((detail) => detail.message).join(', ');
-            errorMessage = `Validation error: ${validationErrors}`;
+      const transfers = (response as { data: { transfers: Array<{
+        recipient?: {
+          name?: string;
+          email?: string;
+          iban?: string;
+          accountNumber?: string;
+          bankName?: string;
+        };
+        targetCurrency: string;
+        sourceCurrency: string;
+        createdAt: string;
+        sourceAmount: number;
+      }> } }).data.transfers || [];
+      
+      // Extract unique recipients from transfers
+      const recipientMap = new Map<string, Recipient>();
+      
+      transfers.forEach((transfer: {
+        recipient?: {
+          name?: string;
+          email?: string;
+          iban?: string;
+          accountNumber?: string;
+          bankName?: string;
+        };
+        targetCurrency: string;
+        sourceCurrency: string;
+        createdAt: string;
+        sourceAmount: number;
+      }) => {
+        // Only include outgoing transfers (sent money) where sourceAmount is negative
+        if (transfer.sourceAmount < 0 && transfer.recipient && transfer.recipient.name) {
+          const recipientKey = transfer.recipient.iban || transfer.recipient.accountNumber || transfer.recipient.name;
+          const existing = recipientMap.get(recipientKey);
+          
+          // Keep the most recent transfer for each recipient
+          if (!existing || new Date(transfer.createdAt) > new Date(existing.lastUsed)) {
+            recipientMap.set(recipientKey, {
+              id: recipientKey,
+              name: transfer.recipient.name,
+              email: transfer.recipient.email,
+              iban: transfer.recipient.iban,
+              currency: transfer.targetCurrency,
+              country: getCountryFromCurrency(transfer.targetCurrency),
+              lastUsed: formatRelativeTime(transfer.createdAt)
+            });
           }
-        } else if (apiError.message.includes('insufficient')) {
-          errorMessage = 'Insufficient balance for this transfer';
-        } else {
-          errorMessage = apiError.message;
         }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
+      });
       
-      setError(errorMessage);
-      setStep('quote'); // Go back to quote step on error
+      // Convert to array and sort by most recent
+      const recipients = Array.from(recipientMap.values()).slice(0, 5); // Show max 5 recent recipients
+      setRecentRecipients(recipients);
+    } catch (error) {
+      console.error('Error loading recent recipients:', error);
+      // Don't show error to user - just show empty list
+      setRecentRecipients([]);
     } finally {
-      setIsLoading(false);
+      setIsLoadingRecipients(false);
     }
   };
 
-  const handleTransferComplete = () => {
-    // Refresh wallet data
-    useWalletStore.getState().fetchWalletData();
-    
-    Alert.alert(
-      'Transfer Complete!',
-      `Your transfer of ${transferService.formatAmount(parseFloat(amount), selectedAccount?.currency || 'EUR')} has been completed successfully.`,
-      [
-        {
-          text: 'View Transactions',
-          onPress: () => router.push('/(dashboard)/transactions'),
-        },
-        {
-          text: 'Send Another',
-          onPress: () => {
-            // Reset form
-            setStep('amount');
-            setAmount('');
-            setRecipientName('');
-            setRecipientIban('');
-            setReference('');
-            setDescription('');
-            setQuote(null);
-            setError(null);
-          },
-        },
-        {
-          text: 'Done',
-          onPress: () => router.back(),
-        },
-      ]
-    );
+  const getCountryFromCurrency = (currency: string): string => {
+    const currencyCountryMap: Record<string, string> = {
+      'EUR': 'EU',
+      'USD': 'US',
+      'GBP': 'GB',
+      'HNL': 'HN',
+      'CAD': 'CA',
+      'AUD': 'AU',
+      'CHF': 'CH',
+      'JPY': 'JP'
+    };
+    return currencyCountryMap[currency] || 'XX';
   };
 
-  const renderAmountStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Send Money</Text>
-      <Text style={styles.stepSubtitle}>How much would you like to send?</Text>
+  const formatRelativeTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+    } else if (diffDays < 365) {
+      const months = Math.floor(diffDays / 30);
+      return months === 1 ? '1 month ago' : `${months} months ago`;
+    } else {
+      const years = Math.floor(diffDays / 365);
+      return years === 1 ? '1 year ago' : `${years} years ago`;
+    }
+  };
 
-      {selectedAccount && (
-        <View style={styles.accountInfo}>
-          <Text style={styles.accountName}>{selectedAccount.name}</Text>
-          <Text style={styles.accountBalance}>
-            Available: {wiseService.formatAmount(balance?.amount || 0, selectedAccount.currency)}
-          </Text>
-        </View>
-      )}
+  const handleAddRecipient = () => {
+    setStep('currency');
+  };
 
-      <SimpleInput
-        label="Amount"
-        value={amount}
-        onChangeText={setAmount}
-        placeholder="0.00"
-        keyboardType="numeric"
-        required
-        error={error || undefined}
-      />
+  const handleSelectCurrency = (currency: 'EUR' | 'HNL') => {
+    setSelectedCurrency(currency);
+    setStep('method');
+  };
 
-      <View style={styles.currencySection}>
-        <Text style={styles.sectionTitle}>To Currency</Text>
-        <View style={styles.currencyGrid}>
-          {currencies.slice(0, 6).map((currency) => (
-            <Button
-              key={currency.code}
-              title={`${currency.symbol} ${currency.code}`}
-              onPress={() => setTargetCurrency(currency.code)}
-              style={targetCurrency === currency.code 
-                ? [styles.currencyButton, styles.selectedButton]
-                : styles.currencyButton}
-              variant={targetCurrency === currency.code ? 'primary' : 'outline'}
-            />
-          ))}
-        </View>
+  const handleSelectMethod = (method: 'wise_user' | 'bank_account') => {
+    if (method === 'bank_account') {
+      // Navigate to add recipient form
+      router.push({
+        pathname: '/add-recipient',
+        params: { currency: selectedCurrency }
+      });
+    } else {
+      // For now, show alert for app user search - to be implemented later
+      Alert.alert('Find App User', 'User search feature coming soon', [
+        { text: 'OK' }
+      ]);
+    }
+  };
+
+  const renderRecipientsStep = () => (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Send Money</Text>
+        <Text style={styles.subtitle}>Choose a recipient or add a new one</Text>
       </View>
 
-      <View style={styles.currencySection}>
-        <Text style={styles.sectionTitle}>To Country</Text>
-        <View style={styles.countryGrid}>
-          {countries.slice(0, 4).map((country) => (
-            <Button
-              key={country.code}
-              title={`${country.code} - ${country.name}`}
-              onPress={() => setTargetCountry(country.code)}
-              style={targetCountry === country.code 
-                ? [styles.countryButton, styles.selectedButton]
-                : styles.countryButton}
-              variant={targetCountry === country.code ? 'primary' : 'outline'}
-            />
-          ))}
-        </View>
-      </View>
+      <View style={styles.content}>
+        {/* Add Recipient Button */}
+        <TouchableOpacity style={styles.addRecipientCard} onPress={handleAddRecipient}>
+          <View style={styles.addIconContainer}>
+            <Text style={styles.addIcon}>+</Text>
+          </View>
+          <View style={styles.addRecipientContent}>
+            <Text style={styles.addRecipientTitle}>Add recipient</Text>
+            <Text style={styles.addRecipientSubtitle}>Send money to someone new</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
 
-      <Button
-        title="Get Quote"
-        onPress={handleGetQuote}
-        loading={isLoading}
-        style={styles.actionButton}
-      />
-    </View>
-  );
-
-  const renderRecipientStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Recipient Details</Text>
-      <Text style={styles.stepSubtitle}>Who are you sending money to?</Text>
-
-      <SimpleInput
-        label="Recipient Name"
-        value={recipientName}
-        onChangeText={setRecipientName}
-        placeholder="Enter recipient's full name"
-        autoCapitalize="words"
-        required
-      />
-
-      <SimpleInput
-        label="IBAN"
-        value={recipientIban}
-        onChangeText={setRecipientIban}
-        placeholder="DE89 3704 0044 0532 0130 00"
-        autoCapitalize="characters"
-        required
-      />
-
-      <SimpleInput
-        label="Reference (Optional)"
-        value={reference}
-        onChangeText={setReference}
-        placeholder="Payment reference"
-        maxLength={100}
-      />
-
-      <SimpleInput
-        label="Description (Optional)"
-        value={description}
-        onChangeText={setDescription}
-        placeholder="What's this transfer for?"
-        maxLength={500}
-        multiline
-      />
-
-      {error && <Text style={styles.errorText}>{error}</Text>}
-
-      <View style={styles.buttonRow}>
-        <Button
-          title="Back"
-          onPress={() => setStep('amount')}
-          variant="outline"
-          style={styles.halfButton}
-        />
-        <Button
-          title="Continue"
-          onPress={handleShowQuote}
-          style={styles.halfButton}
-        />
+        {/* Recent Recipients */}
+        {isLoadingRecipients ? (
+          <View style={styles.recipientsSection}>
+            <Text style={styles.sectionTitle}>Recent recipients</Text>
+            <View style={styles.loadingCard}>
+              <Text style={styles.loadingText}>Loading recent recipients...</Text>
+            </View>
+          </View>
+        ) : recentRecipients.length > 0 ? (
+          <View style={styles.recipientsSection}>
+            <Text style={styles.sectionTitle}>Recent recipients</Text>
+            {recentRecipients.map((recipient) => (
+              <TouchableOpacity 
+                key={recipient.id} 
+                style={styles.recipientCard}
+                onPress={() => {
+                  // For now, show alert - this would navigate to transfer amount
+                  Alert.alert('Send to Recipient', `Send money to ${recipient.name}`, [
+                    { text: 'OK', onPress: () => router.back() }
+                  ]);
+                }}
+              >
+                <View style={styles.recipientAvatar}>
+                  <Text style={styles.recipientInitials}>
+                    {recipient.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.recipientInfo}>
+                  <Text style={styles.recipientName}>{recipient.name}</Text>
+                  <Text style={styles.recipientDetails}>
+                    {recipient.email ? `${recipient.email} • ` : ''}
+                    {recipient.currency} • {recipient.lastUsed}
+                  </Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.recipientsSection}>
+            <Text style={styles.sectionTitle}>Recent recipients</Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No recent recipients</Text>
+              <Text style={styles.emptySubtext}>Start by adding a new recipient above</Text>
+            </View>
+          </View>
+        )}
       </View>
     </View>
   );
 
-  const renderQuoteStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Transfer Summary</Text>
-      <Text style={styles.stepSubtitle}>Review your transfer details</Text>
-
-      {quote && (
-        <View style={styles.quoteContainer}>
-          <View style={styles.quoteRow}>
-            <Text style={styles.quoteLabel}>You send</Text>
-            <Text style={styles.quoteValue}>
-              {transferService.formatAmount(quote.sourceAmount, quote.sourceCurrency)}
-            </Text>
-          </View>
-
-          <View style={styles.quoteRow}>
-            <Text style={styles.quoteLabel}>Fee</Text>
-            <Text style={styles.quoteValue}>
-              {transferService.formatAmount(quote.fee, quote.feeCurrency)}
-            </Text>
-          </View>
-
-          <View style={styles.quoteDivider} />
-
-          <View style={styles.quoteRow}>
-            <Text style={styles.quoteLabelBold}>Total cost</Text>
-            <Text style={styles.quoteValueBold}>
-              {transferService.formatAmount(quote.totalCost, quote.sourceCurrency)}
-            </Text>
-          </View>
-
-          <View style={styles.quoteRow}>
-            <Text style={styles.quoteLabel}>Exchange rate</Text>
-            <Text style={styles.quoteValue}>
-              {transferService.formatExchangeRate(quote.exchangeRate, quote.sourceCurrency, quote.targetCurrency)}
-            </Text>
-          </View>
-
-          <View style={styles.quoteRow}>
-            <Text style={styles.quoteLabelBold}>Recipient gets</Text>
-            <Text style={styles.quoteValueBold}>
-              {transferService.formatAmount(quote.targetAmount, quote.targetCurrency)}
-            </Text>
-          </View>
-
-          <View style={styles.quoteRow}>
-            <Text style={styles.quoteLabel}>Delivery time</Text>
-            <Text style={styles.quoteValue}>{quote.processingTime}</Text>
-          </View>
-        </View>
-      )}
-
-      <View style={styles.recipientSummary}>
-        <Text style={styles.summaryTitle}>Sending to:</Text>
-        <Text style={styles.summaryValue}>{recipientName}</Text>
-        <Text style={styles.summaryValue}>{recipientIban}</Text>
-        {reference && <Text style={styles.summaryValue}>Ref: {reference}</Text>}
+  const renderCurrencyStep = () => (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Choose Currency</Text>
+        <Text style={styles.subtitle}>Select the currency you want to send</Text>
       </View>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      <View style={styles.content}>
+        {/* Euros Option */}
+        <TouchableOpacity 
+          style={styles.currencyCard} 
+          onPress={() => handleSelectCurrency('EUR')}
+        >
+          <View style={styles.currencyIcon}>
+            <Text style={styles.currencyEmoji}>🇪🇺</Text>
+          </View>
+          <View style={styles.currencyContent}>
+            <Text style={styles.currencyTitle}>Euros</Text>
+            <Text style={styles.currencySubtitle}>Send EUR to Europe</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
 
-      <View style={styles.buttonRow}>
-        <Button
-          title="Back"
-          onPress={() => setStep('recipient')}
-          variant="outline"
-          style={styles.halfButton}
-        />
-        <Button
-          title="Confirm Transfer"
-          onPress={handleConfirmTransfer}
-          loading={isLoading}
-          style={styles.halfButton}
-        />
+        {/* Other Currencies Section */}
+        <View style={styles.otherCurrenciesSection}>
+          <Text style={styles.sectionTitle}>Other currencies</Text>
+          
+          <TouchableOpacity 
+            style={styles.currencyCard} 
+            onPress={() => handleSelectCurrency('HNL')}
+          >
+            <View style={styles.currencyIcon}>
+              <Text style={styles.currencyEmoji}>🇭🇳</Text>
+            </View>
+            <View style={styles.currencyContent}>
+              <Text style={styles.currencyTitle}>Honduran Lempira</Text>
+              <Text style={styles.currencySubtitle}>Send HNL to Honduras</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
+
+  const renderMethodStep = () => (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>
+          {selectedCurrency === 'EUR' ? 'Send Euros' : 'Send Lempira'}
+        </Text>
+        <Text style={styles.subtitle}>How do you want to send money?</Text>
+      </View>
+
+      <View style={styles.content}>
+        {selectedCurrency === 'EUR' && (
+          <TouchableOpacity 
+            style={styles.methodCard} 
+            onPress={() => handleSelectMethod('wise_user')}
+          >
+            <View style={styles.methodIcon}>
+              <Text style={styles.methodEmoji}>👤</Text>
+            </View>
+            <View style={styles.methodContent}>
+              <Text style={styles.methodTitle}>To an app user</Text>
+              <Text style={styles.methodSubtitle}>
+                Search by username, email, or phone number
+              </Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity 
+          style={styles.methodCard} 
+          onPress={() => handleSelectMethod('bank_account')}
+        >
+          <View style={styles.methodIcon}>
+            <Text style={styles.methodEmoji}>🏦</Text>
+          </View>
+          <View style={styles.methodContent}>
+            <Text style={styles.methodTitle}>
+              {selectedCurrency === 'EUR' ? 'To a bank account (IBAN)' : 'To a bank account'}
+            </Text>
+            <Text style={styles.methodSubtitle}>
+              {selectedCurrency === 'EUR' 
+                ? 'Enter recipient name and IBAN' 
+                : 'Enter recipient bank details'
+              }
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderStep = () => {
+    switch (step) {
+      case 'recipients':
+        return renderRecipientsStep();
+      case 'currency':
+        return renderCurrencyStep();
+      case 'method':
+        return renderMethodStep();
+      default:
+        return renderRecipientsStep();
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {step === 'processing' ? (
-        <TransferProcessing
-          amount={transferService.formatAmount(parseFloat(amount), selectedAccount?.currency || 'EUR')}
-          currency={selectedAccount?.currency || 'EUR'}
-          recipientName={recipientName}
-          onComplete={handleTransferComplete}
-        />
-      ) : (
-        <>
-          <ScrollView 
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            {step === 'amount' && renderAmountStep()}
-            {step === 'recipient' && renderRecipientStep()}
-            {step === 'quote' && renderQuoteStep()}
-          </ScrollView>
-
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 4) }]}>
-            <Button
-              title="Cancel"
-              onPress={() => router.back()}
-              variant="outline"
-              style={styles.cancelButton}
-            />
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Header with back button */}
+        {step !== 'recipients' && (
+          <View style={styles.navigationHeader}>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={() => {
+                if (step === 'currency') {
+                  setStep('recipients');
+                } else if (step === 'method') {
+                  setStep('currency');
+                } else {
+                  router.back();
+                }
+              }}
+            >
+              <Text style={styles.backIcon}>‹</Text>
+            </TouchableOpacity>
           </View>
-        </>
-      )}
+        )}
+        
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderStep()}
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8fafb',
+  },
   container: {
     flex: 1,
+    backgroundColor: '#f8fafb',
+  },
+  navigationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#f8fafb',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backIcon: {
+    fontSize: 24,
+    color: '#374151',
+    fontWeight: '300',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingBottom: 40,
   },
-  stepContainer: {
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 32,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1a1d29',
+    marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#64748b',
+    lineHeight: 24,
+  },
+  content: {
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  
+  // Add Recipient Card
+  addRecipientCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  addIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  addIcon: {
+    fontSize: 24,
+    color: '#2563eb',
+    fontWeight: '300',
+  },
+  addRecipientContent: {
     flex: 1,
   },
-  stepTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  stepSubtitle: {
-    fontSize: 16,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  accountInfo: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-  },
-  accountName: {
-    fontSize: 16,
+  addRecipientTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#333333',
+    color: '#1e293b',
     marginBottom: 4,
   },
-  accountBalance: {
+  addRecipientSubtitle: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#64748b',
+    fontWeight: '500',
   },
-  currencySection: {
-    marginBottom: 24,
+  chevron: {
+    fontSize: 20,
+    color: '#94a3b8',
+    fontWeight: '300',
+  },
+  
+  // Recipients Section
+  recipientsSection: {
+    marginTop: 24,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#333333',
-    marginBottom: 12,
+    color: '#1e293b',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+    letterSpacing: -0.3,
   },
-  currencyGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  currencyButton: {
-    flex: 1,
-    minWidth: '30%',
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  countryGrid: {
-    gap: 8,
-  },
-  countryButton: {
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  selectedButton: {
-    backgroundColor: '#007AFF',
-    shadowOpacity: 0.1,
-    elevation: 2,
-  },
-  actionButton: {
-    marginTop: 24,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  halfButton: {
-    flex: 1,
-  },
-  quoteContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-  },
-  quoteRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  quoteLabel: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  quoteLabelBold: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  quoteValue: {
-    fontSize: 14,
-    color: '#333333',
-  },
-  quoteValueBold: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  quoteDivider: {
-    height: 1,
-    backgroundColor: '#dee2e6',
-    marginVertical: 8,
-  },
-  recipientSummary: {
-    backgroundColor: '#e3f2fd',
-    borderRadius: 12,
+  recipientCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f8fafc',
   },
-  summaryTitle: {
+  recipientAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e0e7ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  recipientInitials: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1976d2',
-    marginBottom: 8,
+    color: '#3730a3',
   },
-  summaryValue: {
-    fontSize: 14,
-    color: '#333333',
+  recipientInfo: {
+    flex: 1,
+  },
+  recipientName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  recipientDetails: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  
+  // Loading and Empty States
+  loadingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f8fafc',
+  },
+  loadingText: {
+    fontSize: 15,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  emptyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f8fafc',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '600',
     marginBottom: 4,
   },
-  errorText: {
-    color: '#dc3545',
+  emptySubtext: {
     fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
     textAlign: 'center',
-    marginTop: 8,
   },
-  footer: {
-    paddingHorizontal: 24,
-    paddingTop: 6,
-    alignItems: 'center',
+  
+  // Currency Selection
+  currencyCard: {
     backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    marginBottom: 12,
   },
-  cancelButton: {
-    width: '45%',
+  currencyIcon: {
+    width: 48,
     height: 48,
-    backgroundColor: 'transparent',
-    shadowOpacity: 0,
-    elevation: 0,
+    borderRadius: 24,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  currencyEmoji: {
+    fontSize: 24,
+  },
+  currencyContent: {
+    flex: 1,
+  },
+  currencyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  currencySubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  otherCurrenciesSection: {
+    marginTop: 24,
+  },
+  
+  // Method Selection
+  methodCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    marginBottom: 12,
+  },
+  methodIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  methodEmoji: {
+    fontSize: 22,
+  },
+  methodContent: {
+    flex: 1,
+  },
+  methodTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  methodSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+    lineHeight: 20,
   },
 });

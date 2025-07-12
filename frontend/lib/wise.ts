@@ -5,8 +5,7 @@ import type {
   WiseTransaction, 
   CreateWiseAccountRequest, 
   WiseAuthResponse, 
-  WiseProfile,
-  WiseError 
+  WiseProfile
 } from '../types/wise';
 
 export class WiseService {

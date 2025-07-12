@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { router } from 'expo-router';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
 import { wiseService } from '../../lib/wise';
 import { transferService } from '../../lib/transfer';
+import { apiClient } from '../../lib/api';
 import Button from '../../components/ui/Button';
 import type { Transfer } from '../../types/transfer';
 
 export default function DashboardScreen() {
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const { 
     accounts, 
     selectedAccount, 
@@ -24,22 +25,123 @@ export default function DashboardScreen() {
   
   const [recentTransfers, setRecentTransfers] = useState<Transfer[]>([]);
   const [isLoadingTransfers, setIsLoadingTransfers] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const [lastAutoRefreshTime, setLastAutoRefreshTime] = useState<Date | null>(null);
 
   const loadRecentTransfers = async () => {
-    if (!user) {
+    if (!user || !token) {
+      console.log('❌ Cannot load transfers: missing user or token', { 
+        hasUser: !!user, 
+        hasToken: !!token,
+        tokenLength: token?.length || 0
+      });
       return;
     }
     
     setIsLoadingTransfers(true);
     try {
+      console.log('🔍 Loading recent transfers with auth token...');
+      
+      // Ensure API client has the token
+      apiClient.setAuthToken(token);
+      
       const response = await transferService.getTransferHistory(3, 0); // Load last 3 transfers
       setRecentTransfers(response.transfers);
+      console.log('✅ Recent transfers loaded:', response.transfers.length, 'transfers');
     } catch (error) {
-      console.error('Failed to load recent transfers:', error);
+      console.error('❌ Failed to load recent transfers:', error);
+      // If it's an auth error, clear the transfers
+      if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 401) {
+        console.log('🔑 Auth error detected - clearing transfers and checking token');
+        console.log('Token details:', {
+          hasToken: !!token,
+          tokenPreview: token ? `${token.substring(0, 10)}...` : 'none'
+        });
+        setRecentTransfers([]);
+      }
     } finally {
       setIsLoadingTransfers(false);
     }
   };
+
+  // Comprehensive refresh function that updates all data
+  const refreshAllData = useCallback(async (skipThrottle = false) => {
+    // Get current values directly from stores instead of depending on props
+    const currentUser = useAuthStore.getState().user;
+    const currentToken = useAuthStore.getState().token;
+    const { selectedAccount: currentAccount, loadAccounts, refreshBalance } = useWalletStore.getState();
+    
+    if (!currentUser || !currentToken) {
+      console.log('❌ Cannot refresh data: missing user or token');
+      return;
+    }
+
+    // Throttle auto-refresh to prevent rapid successive calls (unless skipThrottle is true)
+    if (!skipThrottle && lastAutoRefreshTime) {
+      const timeSinceLastRefresh = Date.now() - lastAutoRefreshTime.getTime();
+      const minRefreshInterval = 10000; // 10 seconds minimum between auto-refreshes
+      
+      if (timeSinceLastRefresh < minRefreshInterval) {
+        console.log(`⏳ Throttling refresh - only ${timeSinceLastRefresh}ms since last refresh`);
+        return;
+      }
+    }
+
+    setLastAutoRefreshTime(new Date());
+    console.log('🔄 Refreshing all dashboard data...');
+    
+    try {
+      // Refresh accounts and balance
+      await loadAccounts();
+      
+      // Refresh balance for selected account
+      if (currentAccount) {
+        await refreshBalance(currentAccount.id);
+      }
+      
+      // Refresh recent transfers
+      await loadRecentTransfers();
+      
+      // Update last refresh time
+      setLastRefreshTime(new Date());
+      
+      console.log('✅ Dashboard data refreshed successfully');
+    } catch (error) {
+      console.error('❌ Failed to refresh dashboard data:', error);
+      
+      // Check if it's an auth error
+      if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 401) {
+        console.log('🔑 Authentication error during refresh - user may need to login again');
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please log in again.',
+          [
+            {
+              text: 'Log In',
+              onPress: () => {
+                logout();
+                router.replace('/');
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Refresh Failed',
+          'Unable to refresh data. Please check your connection and try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  }, []); // Empty dependency array - function is completely self-contained
+
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await refreshAllData(true); // Skip throttling for manual refresh
+    setIsRefreshing(false);
+  }, [refreshAllData]);
 
   const getTransferType = (transfer: Transfer): 'send' | 'receive' => {
     return transfer.sourceAmount > 0 ? 'receive' : 'send';
@@ -47,12 +149,54 @@ export default function DashboardScreen() {
 
   const getRecipientName = (transfer: Transfer): string => {
     if (getTransferType(transfer) === 'receive') {
+      // For incoming transfers, try to extract sender name from description
       if (transfer.description?.includes('Transfer from')) {
-        return transfer.description.replace('Transfer from ', '') || 'Another user';
+        const senderName = transfer.description.replace('Transfer from ', '').trim();
+        return senderName || 'App user';
       }
-      return 'Another user';
+      // Try to get from reference field
+      if (transfer.reference?.includes('Transfer from')) {
+        const senderName = transfer.reference.replace('Transfer from ', '').trim();
+        return senderName || 'App user';
+      }
+      return 'App user';
     }
-    return transfer.recipient?.name || transfer.description || 'Unknown recipient';
+    
+    // For outgoing transfers, show recipient name
+    if (transfer.recipient?.name) {
+      return transfer.recipient.name;
+    }
+    
+    // Fallback to extracting from reference
+    if (transfer.reference?.includes('Transfer to')) {
+      const recipientName = transfer.reference.replace('Transfer to ', '').trim();
+      return recipientName || 'Recipient';
+    }
+    
+    return 'Recipient';
+  };
+
+  const getTransferDescription = (transfer: Transfer): string => {
+    const transferType = getTransferType(transfer);
+    
+    if (transferType === 'receive') {
+      // For incoming transfers
+      if (transfer.sourceCurrency === transfer.targetCurrency) {
+        return 'Money received';
+      } else {
+        return `${transfer.sourceCurrency} to ${transfer.targetCurrency} conversion`;
+      }
+    } else {
+      // For outgoing transfers
+      if (transfer.recipient?.bankName) {
+        return `Transfer to ${transfer.recipient.bankName}`;
+      }
+      if (transfer.sourceCurrency === transfer.targetCurrency) {
+        return 'Money sent';
+      } else {
+        return `${transfer.sourceCurrency} to ${transfer.targetCurrency} transfer`;
+      }
+    }
   };
 
   const handleLogout = () => {
@@ -107,12 +251,8 @@ export default function DashboardScreen() {
     }
   }, [selectedAccount, balance, refreshBalance]);
 
-  // Refresh recent transfers when balance updates (in case new transfers were made)
-  useEffect(() => {
-    if (balance && user && isInitialized) {
-      loadRecentTransfers();
-    }
-  }, [balance?.updatedAt, user, isInitialized]);
+  // Note: Removed balance-dependent effect to prevent infinite loops
+  // Recent transfers will be refreshed via focus effect and manual refresh
 
   // Auto-select first account if no account is selected but accounts exist
   useEffect(() => {
@@ -121,12 +261,51 @@ export default function DashboardScreen() {
     }
   }, [accounts, selectedAccount, selectAccount]);
 
-  // Load recent transfers when user is available
-  useEffect(() => {
-    if (user && isInitialized) {
-      loadRecentTransfers();
-    }
-  }, [user, isInitialized]);
+  // Auto-refresh data when screen comes into focus (handles initial load too)
+  useFocusEffect(
+    useCallback(() => {
+      // Check current state when focus occurs
+      const currentUser = useAuthStore.getState().user;
+      const currentToken = useAuthStore.getState().token;
+      const { isInitialized: currentInitialized } = useWalletStore.getState();
+      
+      if (currentUser && currentToken && currentInitialized) {
+        console.log('📱 Dashboard screen focused - refreshing data...');
+        refreshAllData(true); // Skip throttling for focus refresh
+      }
+    }, [refreshAllData])
+  );
+
+  // Periodic auto-refresh every 2 minutes when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      // Check current auth state inside the callback
+      const currentUser = useAuthStore.getState().user;
+      const currentToken = useAuthStore.getState().token;
+      const { isInitialized: currentInitialized } = useWalletStore.getState();
+      
+      if (!currentUser || !currentToken || !currentInitialized) {
+        return;
+      }
+
+      const autoRefreshInterval = setInterval(() => {
+        // Double-check auth state before each auto-refresh
+        const intervalUser = useAuthStore.getState().user;
+        const intervalToken = useAuthStore.getState().token;
+        
+        if (intervalUser && intervalToken) {
+          console.log('⏰ Auto-refreshing dashboard data (2-minute interval)...');
+          refreshAllData();
+        }
+      }, 2 * 60 * 1000); // 2 minutes
+
+      // Cleanup interval when screen loses focus
+      return () => {
+        console.log('🛑 Stopping auto-refresh (screen unfocused)');
+        clearInterval(autoRefreshInterval);
+      };
+    }, [refreshAllData])
+  );
 
   if (!user) {
     return (
@@ -140,7 +319,20 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={['#2563eb']} // Android
+            tintColor="#2563eb" // iOS
+            title="Pull to refresh"
+            titleColor="#64748b"
+          />
+        }
+      >
         {/* User Profile Header - Wise Style */}
         <View style={styles.profileHeader}>
           <View style={styles.profileInfo}>
@@ -161,9 +353,11 @@ export default function DashboardScreen() {
               <Text style={styles.userEmail}>{user.email}</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Total Balance Section - Wise Style - Only show when user has created accounts */}
@@ -172,6 +366,17 @@ export default function DashboardScreen() {
             <Text style={styles.totalBalanceLabel}>Total Balance</Text>
             <Text style={styles.totalBalanceAmount}>
               {wiseService.formatAmount(balance.amount, selectedAccount.currency)}
+            </Text>
+            <Text style={styles.lastUpdatedText}>
+              Last updated: {lastRefreshTime ? lastRefreshTime.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : balance.updatedAt ? new Date(balance.updatedAt).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : 'Never'}
             </Text>
             <View style={styles.balanceActions}>
               <TouchableOpacity 
@@ -298,9 +503,12 @@ export default function DashboardScreen() {
                   <View key={transfer.id} style={styles.activityItem}>
                     <View style={styles.activityInfo}>
                       <Text style={styles.activityType}>
-                        {transferType === 'send' ? '↗️ Sent to' : '↙️ Received from'}
+                        {transferType === 'send' ? 'Sent to' : 'Received from'}
                       </Text>
                       <Text style={styles.activityRecipient}>{recipientName}</Text>
+                      <Text style={styles.activityDescription}>
+                        {getTransferDescription(transfer)}
+                      </Text>
                       <Text style={styles.activityDate}>
                         {new Date(transfer.createdAt).toLocaleDateString('en-US', {
                           month: 'short',
@@ -311,7 +519,7 @@ export default function DashboardScreen() {
                     <View style={styles.activityAmount}>
                       <Text style={[
                         styles.activityAmountText,
-                        { color: transferType === 'send' ? '#dc3545' : '#28a745' }
+                        { color: transferType === 'send' ? '#6b7280' : '#059669' }
                       ]}>
                         {transferType === 'send' ? '-' : '+'}${amount.toFixed(2)}
                       </Text>
@@ -425,6 +633,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  refreshButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  refreshText: {
+    fontSize: 16,
+    color: '#2563eb',
+  },
   logoutButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -460,7 +687,13 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: 'bold',
     color: '#333333',
-    marginBottom: 24,
+    marginBottom: 8,
+  },
+  lastUpdatedText: {
+    fontSize: 12,
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   balanceActions: {
     flexDirection: 'row',
@@ -692,6 +925,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333333',
     marginBottom: 2,
+  },
+  activityDescription: {
+    fontSize: 13,
+    color: '#6c757d',
+    marginBottom: 4,
+    fontStyle: 'italic',
   },
   activityDate: {
     fontSize: 12,

@@ -1,47 +1,35 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useWalletStore } from '../../lib/walletStore';
-import { wiseService } from '../../lib/wise';
+import { useAuthStore } from '../../lib/auth';
 import Button from '../../components/ui/Button';
-import SimpleInput from '../../components/ui/SimpleInput';
 import type { CreateWiseAccountRequest } from '../../types/wise';
 
 export default function CreateAccountScreen() {
-  const [formData, setFormData] = useState({
-    name: '',
-    currency: 'USD',
-    country: 'US',
-    type: 'SAVINGS' as 'SAVINGS' | 'CHECKING',
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { user } = useAuthStore();
+  const formData = {
+    currency: 'EUR',
+    country: 'DE',
+    type: 'SAVINGS' as const,
+  };
   
   const { createAccount, isLoading, error, clearError } = useWalletStore();
 
-  const currencies = wiseService.getSupportedCurrencies();
-  const countries = wiseService.getSupportedCountries();
+  // Auto-generate account name based on user and currency
+  const generateAccountName = () => {
+    if (!user) {
+      return 'EUR Account';
+    }
+    const userName = `${user.firstName} ${user.lastName}`.trim();
+    return `${userName}'s EUR Account`;
+  };
+
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Account name is required';
-    } else if (formData.name.length < 2) {
-      newErrors.name = 'Account name must be at least 2 characters';
-    } else if (formData.name.length > 50) {
-      newErrors.name = 'Account name must be less than 50 characters';
-    }
-    
-    if (!wiseService.isValidCurrency(formData.currency)) {
-      newErrors.currency = 'Please select a valid currency';
-    }
-    
-    if (!wiseService.isValidCountry(formData.country)) {
-      newErrors.country = 'Please select a valid country';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // Auto-generated name is always valid
+    // Currency and country are fixed to EUR/DE, so always valid
+    return formData.currency === 'EUR' && formData.country === 'DE';
   };
 
   const handleCreateAccount = async () => {
@@ -53,7 +41,7 @@ export default function CreateAccountScreen() {
     
     try {
       const request: CreateWiseAccountRequest = {
-        name: formData.name.trim(),
+        name: generateAccountName(),
         currency: formData.currency,
         country: formData.country,
         type: formData.type,
@@ -62,8 +50,8 @@ export default function CreateAccountScreen() {
       await createAccount(request);
       
       Alert.alert(
-        'Account Created',
-        'Your digital account has been successfully created with a virtual IBAN.',
+        'EUR Account Created',
+        'Your Euro account has been successfully created with a Spanish IBAN.',
         [
           {
             text: 'OK',
@@ -77,12 +65,8 @@ export default function CreateAccountScreen() {
     }
   };
 
-  const updateFormData = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+  // No longer needed since we auto-generate the name
+  // Currency, country, and type are fixed
 
   return (
     <View style={styles.container}>
@@ -92,113 +76,116 @@ export default function CreateAccountScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Create Digital Account</Text>
+          <Text style={styles.title}>Create EUR Account</Text>
           <Text style={styles.subtitle}>
-            Set up a new digital account with virtual IBAN for international transfers
+            Set up a Euro account with Spanish IBAN for European transfers
           </Text>
         </View>
 
         <View style={styles.form}>
-          <SimpleInput
-            label="Account Name"
-            value={formData.name}
-            onChangeText={(value) => updateFormData('name', value)}
-            placeholder="Enter account name (e.g., My USD Account)"
-            autoCapitalize="words"
-            error={errors.name}
-            required
-          />
-
-          <View style={styles.pickerSection}>
-            <Text style={styles.pickerLabel}>Currency *</Text>
-            <View style={styles.currencyGrid}>
-              {currencies.slice(0, 6).map((currency) => (
-                <Button
-                  key={currency.code}
-                  title={`${currency.symbol} ${currency.code}`}
-                  onPress={() => updateFormData('currency', currency.code)}
-                  style={formData.currency === currency.code 
-                    ? [styles.currencyButton, styles.selectedButton]
-                    : styles.currencyButton}
-                  variant={formData.currency === currency.code ? 'primary' : 'outline'}
-                />
-              ))}
-            </View>
-            {errors.currency && (
-              <Text style={styles.errorText}>{errors.currency}</Text>
-            )}
-          </View>
-
-          <View style={styles.pickerSection}>
-            <Text style={styles.pickerLabel}>Country *</Text>
-            <View style={styles.countryGrid}>
-              {countries.slice(0, 6).map((country) => (
-                <Button
-                  key={country.code}
-                  title={`${country.code} - ${country.name}`}
-                  onPress={() => updateFormData('country', country.code)}
-                  style={formData.country === country.code 
-                    ? [styles.countryButton, styles.selectedButton]
-                    : styles.countryButton}
-                  variant={formData.country === country.code ? 'primary' : 'outline'}
-                />
-              ))}
-            </View>
-            {errors.country && (
-              <Text style={styles.errorText}>{errors.country}</Text>
-            )}
-          </View>
-
-          <View style={styles.pickerSection}>
-            <Text style={styles.pickerLabel}>Account Type *</Text>
-            <View style={styles.typeGrid}>
-              <Button
-                title="Savings Account"
-                onPress={() => updateFormData('type', 'SAVINGS')}
-                style={formData.type === 'SAVINGS' 
-                  ? [styles.typeButton, styles.selectedButton]
-                  : styles.typeButton}
-                variant={formData.type === 'SAVINGS' ? 'primary' : 'outline'}
-              />
-              <Button
-                title="Checking Account"
-                onPress={() => updateFormData('type', 'CHECKING')}
-                style={formData.type === 'CHECKING' 
-                  ? [styles.typeButton, styles.selectedButton]
-                  : styles.typeButton}
-                variant={formData.type === 'CHECKING' ? 'primary' : 'outline'}
-              />
+          {/* Account Preview Card */}
+          <View style={styles.previewCard}>
+            <View style={styles.previewHeader}>
+              <View style={styles.iconContainer}>
+                <Text style={styles.accountIcon}>🏦</Text>
+              </View>
+              <View style={styles.previewInfo}>
+                <Text style={styles.previewTitle}>{generateAccountName()}</Text>
+                <Text style={styles.previewSubtitle}>European Banking Account</Text>
+              </View>
             </View>
           </View>
 
-          <View style={styles.infoSection}>
-            <Text style={styles.infoTitle}>What you'll get:</Text>
-            <View style={styles.featureList}>
-              <Text style={styles.featureItem}>• Virtual IBAN for international transfers</Text>
-              <Text style={styles.featureItem}>• Multi-currency support</Text>
-              <Text style={styles.featureItem}>• Real-time balance updates</Text>
-              <Text style={styles.featureItem}>• Secure account management</Text>
+          {/* Account Details */}
+          <View style={styles.detailsContainer}>
+            <Text style={styles.sectionTitle}>Account Details</Text>
+            
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Text style={styles.detailEmoji}>💶</Text>
+              </View>
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>Currency</Text>
+                <Text style={styles.detailValue}>Euro (EUR)</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Text style={styles.detailEmoji}>🇪🇸</Text>
+              </View>
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>IBAN Region</Text>
+                <Text style={styles.detailValue}>Spain</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Text style={styles.detailEmoji}>💰</Text>
+              </View>
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>Account Type</Text>
+                <Text style={styles.detailValue}>Savings Account</Text>
+              </View>
             </View>
           </View>
 
+          {/* Features Section */}
+          <View style={styles.featuresCard}>
+            <Text style={styles.featuresTitle}>What you&apos;ll get</Text>
+            <View style={styles.featuresList}>
+              <View style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Text style={styles.checkIcon}>✓</Text>
+                </View>
+                <Text style={styles.featureText}>Spanish IBAN for European transfers</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Text style={styles.checkIcon}>✓</Text>
+                </View>
+                <Text style={styles.featureText}>Real-time balance updates</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Text style={styles.checkIcon}>✓</Text>
+                </View>
+                <Text style={styles.featureText}>Secure account management</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <View style={styles.featureIcon}>
+                  <Text style={styles.checkIcon}>✓</Text>
+                </View>
+                <Text style={styles.featureText}>Low transfer fees across Europe</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Error Display */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
           <Button
             title="Create Account"
             onPress={handleCreateAccount}
             loading={isLoading}
             style={styles.createButton}
+            textStyle={styles.createButtonText}
           />
-
-          {error && (
-            <Text style={styles.globalErrorText}>{error}</Text>
-          )}
-        </View>
-
-        <View style={styles.footer}>
+          
           <Button
             title="Cancel"
             onPress={() => router.back()}
             variant="outline"
             style={styles.cancelButton}
+            textStyle={styles.cancelButtonText}
           />
         </View>
       </ScrollView>
@@ -209,109 +196,245 @@ export default function CreateAccountScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    paddingTop: 50,
+    backgroundColor: '#f8fafb',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333333',
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1a1d29',
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6c757d',
+    color: '#64748b',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
+    paddingHorizontal: 20,
   },
   form: {
-    marginBottom: 32,
-  },
-  pickerSection: {
-    marginBottom: 24,
-  },
-  pickerLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 12,
-  },
-  currencyGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  currencyButton: {
     flex: 1,
-    minWidth: '30%',
-    marginBottom: 8,
+    gap: 24,
   },
-  countryGrid: {
-    gap: 8,
+  
+  // Preview Card Styles
+  previewCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
-  countryButton: {
-    marginBottom: 8,
-  },
-  typeGrid: {
+  previewHeader: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  typeButton: {
-    flex: 1,
-  },
-  selectedButton: {
-    backgroundColor: '#007AFF',
-  },
-  infoSection: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 12,
-  },
-  featureList: {
-    gap: 8,
-  },
-  featureItem: {
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 20,
-  },
-  createButton: {
-    marginBottom: 16,
-  },
-  globalErrorText: {
-    color: '#dc3545',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  errorText: {
-    color: '#dc3545',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  footer: {
     alignItems: 'center',
   },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  accountIcon: {
+    fontSize: 24,
+  },
+  previewInfo: {
+    flex: 1,
+  },
+  previewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+    lineHeight: 24,
+  },
+  previewSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  
+  // Details Container Styles
+  detailsContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 20,
+    letterSpacing: -0.3,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  detailIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  detailEmoji: {
+    fontSize: 18,
+  },
+  detailContent: {
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: 16,
+    color: '#1e293b',
+    fontWeight: '600',
+  },
+  
+  // Features Card Styles
+  featuresCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  featuresTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 20,
+    letterSpacing: -0.3,
+  },
+  featuresList: {
+    gap: 16,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  featureIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#dcfce7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  checkIcon: {
+    fontSize: 12,
+    color: '#16a34a',
+    fontWeight: '700',
+  },
+  featureText: {
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+    lineHeight: 20,
+    flex: 1,
+  },
+  
+  // Error Styles
+  errorContainer: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  
+  // Action Buttons Styles
+  actionButtons: {
+    gap: 12,
+    paddingTop: 8,
+  },
+  createButton: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#2563eb',
+    shadowColor: '#2563eb',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
   cancelButton: {
-    width: '50%',
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
   },
 });

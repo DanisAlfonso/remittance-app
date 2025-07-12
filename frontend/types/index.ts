@@ -4,7 +4,6 @@ export * from './auth';
 export type RootStackParamList = {
   '(auth)': undefined;
   '(dashboard)': undefined;
-  modal: { title: string };
 };
 
 export type Environment = 'development' | 'staging' | 'production';

@@ -479,6 +479,15 @@ export class TransferService {
         fee: Number(transaction.fee || 0),
         reference: transaction.reference || undefined,
         description: transaction.description || undefined,
+        // Include recipient information for Recent Recipients feature
+        recipient: transaction.recipientName ? {
+          name: transaction.recipientName,
+          email: transaction.recipientEmail || undefined,
+          iban: transaction.recipientIban || undefined,
+          accountNumber: transaction.recipientAccountNumber || undefined,
+          bankName: transaction.recipientBankName || undefined,
+          country: transaction.recipientCountry || undefined,
+        } : undefined,
         createdAt: transaction.createdAt.toISOString(),
         updatedAt: transaction.updatedAt.toISOString(),
         completedAt: transaction.completedAt?.toISOString(),
@@ -541,18 +550,32 @@ export class TransferService {
           reference: transfer.reference,
           description: transfer.description || `Transfer to ${transfer.recipient?.name || 'recipient'}`,
           completedAt: transfer.completedAt ? new Date(transfer.completedAt) : undefined,
+          // Store recipient information for Recent Recipients feature
+          recipientName: transfer.recipient?.name,
+          recipientEmail: transfer.recipient?.email,
+          recipientIban: transfer.recipient?.iban,
+          recipientAccountNumber: transfer.recipient?.accountNumber,
+          recipientBankName: transfer.recipient?.bankName,
+          recipientCountry: transfer.recipient?.country,
         },
       });
 
-      // Update sender's account balance (subtract amount + fee)
-      const newSenderBalance = Number(senderAccount.lastBalance || 0) - (transfer.sourceAmount + transfer.fee);
-      await prisma.wiseAccount.update({
-        where: { id: senderAccount.id },
-        data: {
-          lastBalance: newSenderBalance,
-          balanceUpdatedAt: new Date(),
-        },
-      });
+      // Update sender's balance only if transfer is already completed
+      // For pending/processing transfers, balance will be updated when status changes to COMPLETED
+      if (transfer.status.status === 'COMPLETED') {
+        const newSenderBalance = Number(senderAccount.lastBalance || 0) - (transfer.sourceAmount + transfer.fee);
+        await prisma.wiseAccount.update({
+          where: { id: senderAccount.id },
+          data: {
+            lastBalance: newSenderBalance,
+            balanceUpdatedAt: new Date(),
+          },
+        });
+        console.log('💰 Updated sender balance (transfer completed):', {
+          senderId: senderAccount.id,
+          newBalance: newSenderBalance
+        });
+      }
 
       // Find recipient's account by IBAN or account number
       let recipientAccount = null;
@@ -651,21 +674,8 @@ export class TransferService {
             },
           });
 
-          // Update recipient's balance when transfer completes
-          if (transfer.status.status === 'COMPLETED') {
-            const newRecipientBalance = Number(recipientAccount.lastBalance || 0) + transfer.targetAmount;
-            await prisma.wiseAccount.update({
-              where: { id: recipientAccount.id },
-              data: {
-                lastBalance: newRecipientBalance,
-                balanceUpdatedAt: new Date(),
-              },
-            });
-            console.log('💰 Updated recipient balance:', {
-              recipientId: recipientAccount.id,
-              newBalance: newRecipientBalance
-            });
-          }
+          // Note: Recipient balance will be updated when transfer status changes to COMPLETED
+          // via updateTransferStatus() method to avoid double-counting
           
           console.log('📝 Incoming transaction created successfully');
           
@@ -743,21 +753,50 @@ export class TransferService {
         },
       });
 
-      // If transfer completed, update recipient balance
+      // If transfer completed, update both sender and recipient balances
       if (status === 'COMPLETED') {
+        // Update sender balance (deduct amount + fee)
+        const outgoingTx = await prisma.wiseTransaction.findFirst({
+          where: { id: transferId },
+          include: { wiseAccount: true },
+        });
+
+        if (outgoingTx && outgoingTx.amount < 0) { // Outgoing transaction (negative amount)
+          const deductAmount = Math.abs(Number(outgoingTx.amount)) + Number(outgoingTx.fee || 0);
+          const newSenderBalance = Number(outgoingTx.wiseAccount.lastBalance || 0) - deductAmount;
+          await prisma.wiseAccount.update({
+            where: { id: outgoingTx.wiseAccountId },
+            data: {
+              lastBalance: newSenderBalance,
+              balanceUpdatedAt: new Date(),
+            },
+          });
+          console.log('💳 Updated sender balance on completion:', {
+            senderId: outgoingTx.wiseAccountId,
+            deducted: deductAmount,
+            newBalance: newSenderBalance
+          });
+        }
+
+        // Update recipient balance (add amount)
         const incomingTx = await prisma.wiseTransaction.findFirst({
           where: { id: incomingTxId },
           include: { wiseAccount: true },
         });
 
         if (incomingTx) {
-          const newBalance = Number(incomingTx.wiseAccount.lastBalance || 0) + Number(incomingTx.amount);
+          const newRecipientBalance = Number(incomingTx.wiseAccount.lastBalance || 0) + Number(incomingTx.amount);
           await prisma.wiseAccount.update({
             where: { id: incomingTx.wiseAccountId },
             data: {
-              lastBalance: newBalance,
+              lastBalance: newRecipientBalance,
               balanceUpdatedAt: new Date(),
             },
+          });
+          console.log('💰 Updated recipient balance on completion:', {
+            recipientId: incomingTx.wiseAccountId,
+            added: Number(incomingTx.amount),
+            newBalance: newRecipientBalance
           });
         }
       }

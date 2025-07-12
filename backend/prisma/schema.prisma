@@ -222,6 +222,14 @@ model WiseTransaction {
   reference       String?
   description     String?
   
+  // Recipient details (for Recent Recipients feature)
+  recipientName   String?
+  recipientEmail  String?
+  recipientIban   String?
+  recipientAccountNumber String?
+  recipientBankName String?
+  recipientCountry String?
+  
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

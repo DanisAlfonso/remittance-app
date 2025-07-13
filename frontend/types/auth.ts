@@ -5,6 +5,7 @@ export interface User {
   lastName: string;
   phone?: string;
   country?: string;
+  photoUrl?: string;
   isActive: boolean;
   emailVerified: boolean;
   createdAt: string;

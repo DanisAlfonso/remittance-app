@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import Button from '../../components/ui/Button';
 
@@ -33,17 +34,17 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
           <Text style={styles.subtitle}>Manage your account information</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
@@ -187,7 +188,7 @@ export default function ProfileScreen() {
           />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -195,7 +196,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
-    paddingTop: 50,
   },
   scrollView: {
     flex: 1,
@@ -203,6 +203,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     paddingVertical: 16,
+    paddingBottom: 32,
   },
   header: {
     marginBottom: 32,
@@ -302,6 +303,7 @@ const styles = StyleSheet.create({
   actions: {
     gap: 16,
     marginTop: 16,
+    marginBottom: 16,
   },
   logoutButton: {
     marginBottom: 8,

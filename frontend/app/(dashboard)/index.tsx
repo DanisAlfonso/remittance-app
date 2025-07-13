@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
@@ -7,6 +8,7 @@ import { wiseService } from '../../lib/wise';
 import { transferService } from '../../lib/transfer';
 import { apiClient } from '../../lib/api';
 import Button from '../../components/ui/Button';
+import ProfileCircle from '../../components/ui/ProfileCircle';
 import type { Transfer } from '../../types/transfer';
 
 export default function DashboardScreen() {
@@ -199,30 +201,6 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              router.replace('/(auth)/login');
-            } catch (error) {
-              console.error('Logout error:', error);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   useEffect(() => {
     if (user && !isInitialized) {
@@ -309,16 +287,16 @@ export default function DashboardScreen() {
 
   if (!user) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.title}>Dashboard</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={styles.content}
@@ -333,30 +311,26 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* User Profile Header - Wise Style */}
-        <View style={styles.profileHeader}>
-          <View style={styles.profileInfo}>
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {user.firstName?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>
-                {user.firstName && user.lastName 
-                  ? `${user.firstName} ${user.lastName}` 
-                  : user.email
-                }
-              </Text>
-              <Text style={styles.userEmail}>{user.email}</Text>
-            </View>
+        {/* Header with Welcome Message and Profile Circle */}
+        <View style={styles.headerContainer}>
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeMessage}>Welcome back</Text>
+            <Text style={styles.userDisplayName}>
+              {user.firstName && user.lastName 
+                ? `${user.firstName} ${user.lastName}` 
+                : user.firstName || user.email.split('@')[0]
+              }
+            </Text>
           </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
+          <View style={styles.profileSection}>
+            <ProfileCircle
+              firstName={user.firstName}
+              lastName={user.lastName}
+              email={user.email}
+              photoUrl={user.photoUrl}
+              size={50}
+              onPress={() => router.push('/(dashboard)/profile')}
+            />
           </View>
         </View>
 
@@ -537,37 +511,12 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Navigation</Text>
-          <View style={styles.navigationGroup}>
-            <TouchableOpacity style={styles.navItem}>
-              <View style={styles.navInfo}>
-                <Text style={styles.navTitle}>Profile</Text>
-                <Text style={styles.navDescription}>Manage your account settings</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.navItem}>
-              <View style={styles.navInfo}>
-                <Text style={styles.navTitle}>Transactions</Text>
-                <Text style={styles.navDescription}>View your transaction history</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.navItem}>
-              <View style={styles.navInfo}>
-                <Text style={styles.navTitle}>Beneficiaries</Text>
-                <Text style={styles.navDescription}>Manage your recipients</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
         
         {/* Hidden text for test compatibility */}
         <Text style={{ position: 'absolute', opacity: 0, fontSize: 1, left: -9999 }}>Inactive</Text>
         <Text style={{ position: 'absolute', opacity: 0, fontSize: 1, left: -9999 }}>Not Verified</Text>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -575,7 +524,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
-    paddingTop: 50,
   },
   scrollView: {
     flex: 1,
@@ -584,85 +532,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
   },
-  // Profile Header Styles - Wise Design
-  profileHeader: {
+  // Header Container - Balanced Layout
+  headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    paddingHorizontal: 4,
   },
-  profileInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  welcomeSection: {
     flex: 1,
   },
-  avatarContainer: {
-    marginRight: 16,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333333',
+  welcomeMessage: {
+    fontSize: 16,
+    color: '#6c757d',
+    fontWeight: '500',
     marginBottom: 4,
   },
-  userEmail: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  refreshText: {
-    fontSize: 16,
-    color: '#2563eb',
-  },
-  logoutButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#dc3545',
-  },
-  logoutText: {
-    fontSize: 14,
+  userDisplayName: {
+    fontSize: 20,
     fontWeight: '600',
-    color: '#dc3545',
+    color: '#333333',
+  },
+  profileSection: {
+    alignItems: 'center',
   },
   // Total Balance Section - Wise Style
   totalBalanceSection: {
@@ -800,29 +693,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
     textAlign: 'center',
-  },
-  navigationGroup: {
-    gap: 8,
-  },
-  navItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  navInfo: {
-    flex: 1,
-  },
-  navTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 4,
-  },
-  navDescription: {
-    fontSize: 14,
-    color: '#6c757d',
-    fontWeight: '400',
   },
   walletGroup: {
     gap: 16,

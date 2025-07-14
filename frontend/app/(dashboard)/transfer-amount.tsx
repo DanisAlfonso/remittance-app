@@ -8,11 +8,16 @@ import { apiClient } from '../../lib/api';
 import Button from '../../components/ui/Button';
 
 interface RecipientData {
-  type: string;
+  id?: string; // User ID for @username transfers
+  name?: string; // Display name
+  type: string; // 'user' (via @username) or 'iban' (direct IBAN)
+  currency: string;
+  username?: string; // Username for @username transfers
+  
+  // Bank transfer fields (required for all transfers)
   holderName: string;
   iban: string;
-  bankName: string;
-  currency: string;
+  bankName?: string;
   country: string;
 }
 
@@ -28,14 +33,71 @@ export default function TransferAmountScreen() {
   const { selectedAccount, balance } = useWalletStore();
   const { token } = useAuthStore();
   
+  // Function to fetch user IBAN for @username transfers
+  const fetchUserIban = async (userId: string): Promise<{
+    holderName: string;
+    iban: string;
+    country: string;
+    currency: string;
+  }> => {
+    try {
+      const response = await apiClient.get(`/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }) as {
+        user: {
+          displayName: string;
+          firstName: string;
+          lastName: string;
+          primaryAccount: {
+            iban: string;
+            country: string;
+            currency: string;
+          };
+        };
+      };
+      
+      if (!response.user?.primaryAccount?.iban) {
+        throw new Error('User does not have an active account available for transfers');
+      }
+      
+      const user = response.user;
+      const account = user.primaryAccount;
+      
+      return {
+        holderName: user.displayName || `${user.firstName} ${user.lastName}`,
+        iban: account.iban,
+        country: account.country,
+        currency: account.currency,
+      };
+    } catch (error) {
+      console.error('Error fetching user IBAN:', error);
+      throw new Error('Unable to get recipient account information');
+    }
+  };
+  
   const currency = params.currency as string;
-  const recipientData = JSON.parse(params.recipientData as string) as RecipientData;
+  
+  // Handle both JSON recipientData (from add-recipient) and individual params (from user-search)
+  const recipientData: Partial<RecipientData> = params.recipientData 
+    ? JSON.parse(params.recipientData as string) as RecipientData
+    : {
+        // From user search - this will be @username transfer
+        id: params.recipientId as string,
+        name: params.recipientName as string,
+        type: 'user', // @username transfer type
+        currency: params.currency as string,
+        username: params.recipientUsername as string || undefined,
+        // IBAN will be fetched dynamically
+        holderName: '', // Will be populated
+        iban: '', // Will be populated
+        country: '', // Will be populated
+      };
   
   const [amount, setAmount] = useState('');
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null);
   const [isLoadingRate, setIsLoadingRate] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [fee, setFee] = useState(0);
+  // All transfers are now free - no fees
 
   useEffect(() => {
     if (selectedAccount && currency !== selectedAccount.currency) {
@@ -64,19 +126,7 @@ export default function TransferAmountScreen() {
     }
   };
 
-  const calculateFee = (transferAmount: number): number => {
-    if (!selectedAccount) {
-      return 0;
-    }
-    
-    // Same currency transfer
-    if (currency === selectedAccount.currency) {
-      return 0.5; // €0.50 fixed fee
-    }
-    
-    // Currency conversion - 0.5% or minimum €2
-    return Math.max(2.0, transferAmount * 0.005);
-  };
+  // All transfers are free - no fee calculation needed
 
   const handleAmountChange = (value: string) => {
     // Only allow numbers and decimal point
@@ -95,13 +145,7 @@ export default function TransferAmountScreen() {
     
     setAmount(cleanValue);
     
-    // Calculate fee when amount changes
-    const numAmount = parseFloat(cleanValue);
-    if (!isNaN(numAmount) && numAmount > 0) {
-      setFee(calculateFee(numAmount));
-    } else {
-      setFee(0);
-    }
+    // All transfers are free - no fee calculation needed
   };
 
   const getTargetAmount = (): number => {
@@ -120,7 +164,7 @@ export default function TransferAmountScreen() {
       return 0;
     }
     
-    return (numAmount - fee) * exchangeRate.rate;
+    return numAmount * exchangeRate.rate;
   };
 
   const validateAmount = (): boolean => {
@@ -141,7 +185,7 @@ export default function TransferAmountScreen() {
       return false;
     }
     
-    if (selectedAccount && balance && numAmount + fee > balance.amount) {
+    if (selectedAccount && balance && numAmount > balance.amount) {
       Alert.alert('Insufficient Funds', 'You don\'t have enough balance for this transfer');
       return false;
     }
@@ -157,27 +201,63 @@ export default function TransferAmountScreen() {
     setIsProcessing(true);
     
     try {
+      let finalRecipientData = { ...recipientData };
+      
+      // If this is a @username transfer, fetch the user's IBAN first
+      if (recipientData.type === 'user' && recipientData.id) {
+        console.log('🔍 Fetching IBAN for @username transfer...');
+        const userIbanData = await fetchUserIban(recipientData.id);
+        
+        // Update recipient data with real IBAN information
+        finalRecipientData = {
+          ...recipientData,
+          holderName: userIbanData.holderName,
+          iban: userIbanData.iban,
+          country: userIbanData.country,
+          currency: userIbanData.currency,
+        };
+        
+        console.log('✅ IBAN fetched for user:', {
+          username: recipientData.username,
+          holderName: userIbanData.holderName,
+          iban: userIbanData.iban?.slice(-4), // Only log last 4 digits for security
+          country: userIbanData.country,
+        });
+      }
+      
+      // All transfers now go through Wise API as real bank transfers
       const transferData = {
         recipientAccount: {
-          type: recipientData.type,
-          iban: recipientData.iban,
-          accountNumber: recipientData.iban,
-          currency: recipientData.currency,
-          country: recipientData.country,
-          holderName: recipientData.holderName,
-          bankName: recipientData.bankName,
+          type: 'iban',
+          iban: finalRecipientData.iban,
+          accountNumber: finalRecipientData.iban,
+          currency: finalRecipientData.currency,
+          country: finalRecipientData.country,
+          holderName: finalRecipientData.holderName,
+          bankName: finalRecipientData.bankName || 'Wise Account',
+        },
+        recipientDetails: {
+          firstName: finalRecipientData.holderName?.split(' ')[0] || 'Unknown',
+          lastName: finalRecipientData.holderName?.split(' ').slice(1).join(' ') || 'User',
+          email: 'noreply@example.com', // Required by API but not used for IBAN transfers
         },
         transferDetails: {
           amount: parseFloat(amount),
-          reference: `Transfer to ${recipientData.holderName}`,
-          description: `International transfer to ${recipientData.bankName}`,
+          currency: selectedAccount.currency,
+          reference: recipientData.username 
+            ? `Transfer to @${recipientData.username}` 
+            : `Transfer to ${finalRecipientData.holderName}`,
         }
       };
       
-      // Use the wise transfers endpoint
+      console.log('💸 Executing real bank transfer via Wise API...');
       const response = await apiClient.post('/wise/transfers', transferData, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
+      const recipientName = recipientData.username 
+        ? `${finalRecipientData.holderName} (@${recipientData.username})`
+        : finalRecipientData.holderName;
       
       console.log('Transfer response:', response);
       
@@ -191,7 +271,7 @@ export default function TransferAmountScreen() {
       
       Alert.alert(
         'Transfer Initiated!',
-        `Your transfer of €${amount} to ${recipientData.holderName} has been initiated successfully.`,
+        `Your transfer of €${amount} to ${recipientName} has been initiated successfully.`,
         [
           {
             text: 'View Details',
@@ -202,7 +282,7 @@ export default function TransferAmountScreen() {
                   transferId: transfer.id,
                   amount,
                   currency,
-                  recipientName: recipientData.holderName,
+                  recipientName: recipientName,
                   targetAmount: getTargetAmount().toFixed(2),
                   targetCurrency: currency
                 }
@@ -256,7 +336,9 @@ export default function TransferAmountScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Send {currency}</Text>
             <Text style={styles.subtitle}>
-              To {recipientData.holderName}
+              To {recipientData.type === 'internal' 
+                  ? recipientData.name 
+                  : recipientData.holderName}
             </Text>
           </View>
 
@@ -291,8 +373,8 @@ export default function TransferAmountScreen() {
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Fee</Text>
-                <Text style={styles.detailValue}>
-                  {formatCurrency(fee, selectedAccount?.currency || 'EUR')}
+                <Text style={[styles.detailValue, styles.freeLabel]}>
+                  FREE
                 </Text>
               </View>
               
@@ -301,7 +383,7 @@ export default function TransferAmountScreen() {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Total you pay</Text>
                 <Text style={[styles.detailValue, styles.totalValue]}>
-                  {formatCurrency(parseFloat(amount) + fee, selectedAccount?.currency || 'EUR')}
+                  {formatCurrency(parseFloat(amount), selectedAccount?.currency || 'EUR')}
                 </Text>
               </View>
               
@@ -329,11 +411,31 @@ export default function TransferAmountScreen() {
           <View style={styles.recipientCard}>
             <Text style={styles.recipientTitle}>Recipient</Text>
             <View style={styles.recipientInfo}>
-              <Text style={styles.recipientName}>{recipientData.holderName}</Text>
-              <Text style={styles.recipientIban}>
-                {recipientData.iban.replace(/(.{4})/g, '$1 ').trim()}
+              <Text style={styles.recipientName}>
+                {recipientData.type === 'internal' 
+                  ? recipientData.name 
+                  : recipientData.holderName}
               </Text>
-              <Text style={styles.recipientBank}>{recipientData.bankName}</Text>
+              
+              {recipientData.type === 'internal' ? (
+                // Internal transfer (app user)
+                <>
+                  {recipientData.username && (
+                    <Text style={styles.recipientIban}>
+                      @{recipientData.username}
+                    </Text>
+                  )}
+                  <Text style={styles.recipientBank}>App User Transfer</Text>
+                </>
+              ) : (
+                // External bank transfer
+                <>
+                  <Text style={styles.recipientIban}>
+                    {recipientData.iban?.replace(/(.{4})/g, '$1 ').trim()}
+                  </Text>
+                  <Text style={styles.recipientBank}>{recipientData.bankName}</Text>
+                </>
+              )}
             </View>
           </View>
         </ScrollView>
@@ -570,5 +672,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#64748b',
+  },
+  freeLabel: {
+    color: '#059669',
+    fontWeight: '700',
+    fontSize: 15,
   },
 });

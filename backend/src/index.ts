@@ -7,6 +7,7 @@ import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth';
 import wiseRoutes from './routes/wise';
 import transferRoutes from './routes/transfer';
+import usersRoutes from './routes/users';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -40,6 +41,7 @@ app.get('/api/v1/health', (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/wise', wiseRoutes);
 app.use('/api/v1/transfer', transferRoutes);
+app.use('/api/v1/users', usersRoutes);
 
 app.use((req, res, next) => {
   notFoundHandler(req, res);

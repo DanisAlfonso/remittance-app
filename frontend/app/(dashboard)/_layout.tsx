@@ -35,6 +35,7 @@ export default function DashboardLayout() {
         <Stack.Screen name="add-recipient" />
         <Stack.Screen name="account-details" />
         <Stack.Screen name="create-account" />
+        <Stack.Screen name="user-search" />
         <Stack.Screen name="transfer-amount" />
         <Stack.Screen name="transfer-success" />
       </Stack>

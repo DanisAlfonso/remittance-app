@@ -6,10 +6,10 @@ import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
 import { wiseService } from '../../lib/wise';
 import { transferService } from '../../lib/transfer';
+import type { Transfer } from '../../types/transfer';
 import { apiClient } from '../../lib/api';
 import Button from '../../components/ui/Button';
 import ProfileCircle from '../../components/ui/ProfileCircle';
-import type { Transfer } from '../../types/transfer';
 
 export default function DashboardScreen() {
   const { user, token, logout } = useAuthStore();
@@ -48,7 +48,7 @@ export default function DashboardScreen() {
       // Ensure API client has the token
       apiClient.setAuthToken(token);
       
-      const response = await transferService.getTransferHistory(3, 0); // Load last 3 transfers
+      const response = await transferService.getTransferHistory(3, 0); // Load last 3 Wise transfers
       setRecentTransfers(response.transfers);
       console.log('✅ Recent transfers loaded:', response.transfers.length, 'transfers');
     } catch (error) {
@@ -146,59 +146,24 @@ export default function DashboardScreen() {
   }, [refreshAllData]);
 
   const getTransferType = (transfer: Transfer): 'send' | 'receive' => {
-    return transfer.sourceAmount > 0 ? 'receive' : 'send';
+    return transfer.sourceAmount < 0 ? 'send' : 'receive';
   };
 
   const getRecipientName = (transfer: Transfer): string => {
-    if (getTransferType(transfer) === 'receive') {
-      // For incoming transfers, try to extract sender name from description
-      if (transfer.description?.includes('Transfer from')) {
-        const senderName = transfer.description.replace('Transfer from ', '').trim();
-        return senderName || 'App user';
+    if (transfer.recipient) {
+      const name = transfer.recipient.name || 'Unknown';
+      const iban = transfer.recipient.iban || transfer.recipient.accountNumber;
+      
+      if (iban) {
+        return `${name} (${iban.slice(-4)})`;
       }
-      // Try to get from reference field
-      if (transfer.reference?.includes('Transfer from')) {
-        const senderName = transfer.reference.replace('Transfer from ', '').trim();
-        return senderName || 'App user';
-      }
-      return 'App user';
+      return name;
     }
-    
-    // For outgoing transfers, show recipient name
-    if (transfer.recipient?.name) {
-      return transfer.recipient.name;
-    }
-    
-    // Fallback to extracting from reference
-    if (transfer.reference?.includes('Transfer to')) {
-      const recipientName = transfer.reference.replace('Transfer to ', '').trim();
-      return recipientName || 'Recipient';
-    }
-    
     return 'Recipient';
   };
 
   const getTransferDescription = (transfer: Transfer): string => {
-    const transferType = getTransferType(transfer);
-    
-    if (transferType === 'receive') {
-      // For incoming transfers
-      if (transfer.sourceCurrency === transfer.targetCurrency) {
-        return 'Money received';
-      } else {
-        return `${transfer.sourceCurrency} to ${transfer.targetCurrency} conversion`;
-      }
-    } else {
-      // For outgoing transfers
-      if (transfer.recipient?.bankName) {
-        return `Transfer to ${transfer.recipient.bankName}`;
-      }
-      if (transfer.sourceCurrency === transfer.targetCurrency) {
-        return 'Money sent';
-      } else {
-        return `${transfer.sourceCurrency} to ${transfer.targetCurrency} transfer`;
-      }
-    }
+    return transfer.description || transfer.reference || 'Bank transfer';
   };
 
 
@@ -228,6 +193,7 @@ export default function DashboardScreen() {
       refreshBalance();
     }
   }, [selectedAccount, balance, refreshBalance]);
+
 
   // Note: Removed balance-dependent effect to prevent infinite loops
   // Recent transfers will be refreshed via focus effect and manual refresh
@@ -334,13 +300,14 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Total Balance Section - Wise Style - Only show when user has created accounts */}
+        {/* Total Balance Section - Real Account Balance */}
         {selectedAccount && balance && accounts.length > 0 && (
           <View style={styles.totalBalanceSection}>
             <Text style={styles.totalBalanceLabel}>Total Balance</Text>
             <Text style={styles.totalBalanceAmount}>
               {wiseService.formatAmount(balance.amount, selectedAccount.currency)}
             </Text>
+            
             <Text style={styles.lastUpdatedText}>
               Last updated: {lastRefreshTime ? lastRefreshTime.toLocaleTimeString('en-US', {
                 hour: '2-digit',
@@ -471,7 +438,7 @@ export default function DashboardScreen() {
               {recentTransfers.map((transfer) => {
                 const transferType = getTransferType(transfer);
                 const recipientName = getRecipientName(transfer);
-                const amount = Math.abs(transfer.sourceAmount);
+                const amount = Math.abs(Number(transfer.sourceAmount) || 0);
                 
                 return (
                   <View key={transfer.id} style={styles.activityItem}>

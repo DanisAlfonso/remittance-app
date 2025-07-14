@@ -48,7 +48,7 @@ export default function SendMoneyScreen() {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      const transfers = (response as { data: { transfers: Array<{
+      const transfers = (response as { transfers: Array<{
         recipient?: {
           name?: string;
           email?: string;
@@ -60,7 +60,7 @@ export default function SendMoneyScreen() {
         sourceCurrency: string;
         createdAt: string;
         sourceAmount: number;
-      }> } }).data.transfers || [];
+      }> }).transfers || [];
       
       // Extract unique recipients from transfers
       const recipientMap = new Map<string, Recipient>();
@@ -161,14 +161,15 @@ export default function SendMoneyScreen() {
     if (method === 'bank_account') {
       // Navigate to add recipient form
       router.push({
-        pathname: '/add-recipient',
+        pathname: '/(dashboard)/add-recipient',
         params: { currency: selectedCurrency }
       });
     } else {
-      // For now, show alert for app user search - to be implemented later
-      Alert.alert('Find App User', 'User search feature coming soon', [
-        { text: 'OK' }
-      ]);
+      // Navigate to user search screen
+      router.push({
+        pathname: '/(dashboard)/user-search',
+        params: { currency: selectedCurrency }
+      });
     }
   };
 
@@ -208,10 +209,23 @@ export default function SendMoneyScreen() {
                 key={recipient.id} 
                 style={styles.recipientCard}
                 onPress={() => {
-                  // For now, show alert - this would navigate to transfer amount
-                  Alert.alert('Send to Recipient', `Send money to ${recipient.name}`, [
-                    { text: 'OK', onPress: () => router.back() }
-                  ]);
+                  // Navigate to transfer amount with recipient data
+                  const recipientData = {
+                    type: 'iban', // Bank transfer type
+                    holderName: recipient.name,
+                    iban: recipient.iban,
+                    currency: recipient.currency,
+                    country: recipient.country,
+                    bankName: 'Bank Transfer', // Default for recent recipients
+                  };
+                  
+                  router.push({
+                    pathname: '/(dashboard)/transfer-amount',
+                    params: {
+                      currency: recipient.currency,
+                      recipientData: JSON.stringify(recipientData)
+                    }
+                  });
                 }}
               >
                 <View style={styles.recipientAvatar}>

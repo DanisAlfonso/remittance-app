@@ -6,6 +6,9 @@ export interface User {
   phone?: string;
   country?: string;
   photoUrl?: string;
+  username?: string;
+  displayName?: string;
+  isSearchable?: boolean;
   isActive: boolean;
   emailVerified: boolean;
   createdAt: string;

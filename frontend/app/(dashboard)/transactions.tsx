@@ -132,7 +132,7 @@ export default function TransactionsScreen() {
     const recipientName = getRecipientName(item);
     // Use absolute value of sourceAmount since incoming transfers are already positive
     // and outgoing transfers are negative but we want to show them as positive with - sign
-    const amount = Math.abs(item.sourceAmount);
+    const amount = Math.abs(Number(item.sourceAmount) || 0);
     const currency = item.sourceCurrency;
     
     return (

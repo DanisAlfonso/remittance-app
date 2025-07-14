@@ -32,7 +32,7 @@ const TransferProcessing: React.FC<TransferProcessingProps> = ({
     },
     { 
       title: 'Converting Currency...', 
-      description: 'Processing exchange and calculating fees',
+      description: 'Processing exchange rate',
       duration: 2000,
       wiseStatus: 'funds_converted'
     },

@@ -23,6 +23,11 @@ model User {
   phone     String?
   country   String?
   
+  // User discovery fields
+  username      String? @unique  // @username handle for easy discovery
+  displayName   String?          // Optional display name (defaults to firstName lastName)
+  isSearchable  Boolean @default(true)  // Privacy control for user discovery
+  
   // KYC fields
   kycStatus      KYCStatus @default(PENDING)
   kycSubmittedAt DateTime?
@@ -42,6 +47,18 @@ model User {
   transactions Transaction[]
   beneficiaries Beneficiary[]
   wiseAccounts WiseAccount[]
+  sentInternalTransfers     InternalTransfer[] @relation("Sender")
+  receivedInternalTransfers InternalTransfer[] @relation("Recipient")
+  
+  // Performance indexes for user search
+  @@index([firstName])
+  @@index([lastName]) 
+  @@index([displayName])
+  @@index([isSearchable, isActive])
+  @@index([firstName, lastName])
+  @@index([phone]) // For phone search performance
+  @@index([username]) // Already unique but good for search perf
+  @@index([createdAt]) // For member since sorting
   
   @@map("users")
 }
@@ -259,6 +276,39 @@ enum WiseTransactionType {
 enum WiseTransactionStatus {
   PENDING
   PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model InternalTransfer {
+  id            String @id @default(cuid())
+  senderId      String
+  recipientId   String
+  amount        Decimal @db.Decimal(10, 2)
+  currency      String @db.VarChar(3)
+  
+  // Fee structure
+  platformFee   Decimal? @db.Decimal(10, 2)
+  
+  // Transfer details
+  note          String?
+  reference     String @unique @default(cuid())
+  status        InternalTransferStatus @default(PENDING)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+  
+  // Relations
+  sender        User @relation("Sender", fields: [senderId], references: [id])
+  recipient     User @relation("Recipient", fields: [recipientId], references: [id])
+  
+  @@map("internal_transfers")
+}
+
+enum InternalTransferStatus {
+  PENDING
   COMPLETED
   FAILED
   CANCELLED

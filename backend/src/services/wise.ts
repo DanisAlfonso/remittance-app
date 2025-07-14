@@ -503,7 +503,7 @@ export class WiseService {
       rate: this.getMockExchangeRate(params.sourceCurrency, params.targetCurrency),
       sourceAmount: params.sourceAmount || 100,
       targetAmount: params.targetAmount || (params.sourceAmount || 100) * this.getMockExchangeRate(params.sourceCurrency, params.targetCurrency),
-      fee: { total: Math.max(2, (params.sourceAmount || 100) * 0.005) },
+      fee: { total: 0 }, // All transfers are free
       paymentOptions: [{ estimatedDelivery: 'Within 1 business day' }],
     };
     

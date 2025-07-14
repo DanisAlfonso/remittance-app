@@ -58,32 +58,12 @@ export class TransferService {
   }
 
   /**
-   * Calculate transfer fees based on amount and currency pair
+   * Calculate transfer fees - ALL TRANSFERS ARE FREE
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   calculateFees(amount: number, sourceCurrency: string, targetCurrency: string): TransferFee[] {
-    const fees: TransferFee[] = [];
-
-    // Platform fee (similar to Wise's structure)
-    if (sourceCurrency === targetCurrency) {
-      // Same currency transfer
-      fees.push({
-        type: 'FIXED',
-        amount: 0.5,
-        currency: sourceCurrency,
-        description: 'Transfer fee',
-      });
-    } else {
-      // Currency conversion
-      const conversionFee = Math.max(2.0, amount * 0.005); // 0.5% or minimum $2
-      fees.push({
-        type: 'PERCENTAGE',
-        amount: conversionFee,
-        currency: sourceCurrency,
-        description: 'Currency conversion fee',
-      });
-    }
-
-    return fees;
+    // All transfers are now free - return empty array
+    return [];
   }
 
   /**
@@ -552,11 +532,11 @@ export class TransferService {
           completedAt: transfer.completedAt ? new Date(transfer.completedAt) : undefined,
           // Store recipient information for Recent Recipients feature
           recipientName: transfer.recipient?.name,
-          recipientEmail: transfer.recipient?.email,
+          recipientEmail: undefined, // Email not available in recipient object
           recipientIban: transfer.recipient?.iban,
           recipientAccountNumber: transfer.recipient?.accountNumber,
           recipientBankName: transfer.recipient?.bankName,
-          recipientCountry: transfer.recipient?.country,
+          recipientCountry: undefined, // Country not available in recipient object
         },
       });
 
@@ -761,7 +741,7 @@ export class TransferService {
           include: { wiseAccount: true },
         });
 
-        if (outgoingTx && outgoingTx.amount < 0) { // Outgoing transaction (negative amount)
+        if (outgoingTx && Number(outgoingTx.amount) < 0) { // Outgoing transaction (negative amount)
           const deductAmount = Math.abs(Number(outgoingTx.amount)) + Number(outgoingTx.fee || 0);
           const newSenderBalance = Number(outgoingTx.wiseAccount.lastBalance || 0) - deductAmount;
           await prisma.wiseAccount.update({

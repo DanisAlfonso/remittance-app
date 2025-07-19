@@ -131,16 +131,53 @@ export class WiseService {
    */
   getAccountTypeDisplayName(type: string): string {
     if (!type || typeof type !== 'string') {
-      return 'Unknown Account';
+      return 'Multi-Currency Account';
     }
     switch (type.toUpperCase()) {
       case 'SAVINGS':
         return 'Savings Account';
       case 'CHECKING':
         return 'Checking Account';
+      case 'MULTI_CURRENCY':
+      case 'MULTICURRENCY':
+        return 'Multi-Currency Account';
+      case 'PERSONAL':
+        return 'Personal Account';
+      case 'BUSINESS':
+        return 'Business Account';
       default:
-        return type;
+        return 'Multi-Currency Account';
     }
+  }
+
+  /**
+   * Extract country code from IBAN
+   */
+  getCountryFromIban(iban: string): string {
+    if (!iban || iban.length < 2) {
+      return '';
+    }
+    return iban.substring(0, 2).toUpperCase();
+  }
+
+  /**
+   * Get country name from country code
+   * Focused on specific European markets + Honduras (for remittances)
+   */
+  getCountryName(countryCode: string): string {
+    const countries: Record<string, string> = {
+      // Primary European markets
+      'BE': 'Belgium',
+      'DE': 'Germany', 
+      'EE': 'Estonia',
+      'ES': 'Spain',
+      'FR': 'France',
+      
+      // Central America - Main remittance destination
+      'HN': 'Honduras'
+    };
+    
+    return countries[countryCode.toUpperCase()] || countryCode;
   }
 
   /**

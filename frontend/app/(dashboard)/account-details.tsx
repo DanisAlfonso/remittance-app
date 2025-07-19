@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useWalletStore } from '../../lib/walletStore';
 import { wiseService } from '../../lib/wise';
 import { transferService } from '../../lib/transfer';
-import IbanDisplay from '../../components/ui/IbanDisplay';
+import ComprehensiveBankingDetails from '../../components/ui/ComprehensiveBankingDetails';
 import type { Transfer } from '../../types/transfer';
 
 export default function AccountDetailsScreen() {
@@ -131,7 +131,7 @@ export default function AccountDetailsScreen() {
             <View style={styles.balanceMetadata}>
               <Ionicons name="time-outline" size={12} color="#9CA3AF" />
               <Text style={styles.balanceUpdated}>
-                {balance?.cached ? 'Cached' : 'Updated'} • {balance?.updatedAt ? new Date(balance.updatedAt).toLocaleTimeString() : 'N/A'}
+                Last updated • {balance?.updatedAt ? new Date(balance.updatedAt).toLocaleTimeString() : 'N/A'}
               </Text>
             </View>
           </View>
@@ -175,7 +175,11 @@ export default function AccountDetailsScreen() {
                 <Ionicons name="location" size={20} color="#3B82F6" />
               </View>
               <Text style={styles.infoCardLabel}>Country</Text>
-              <Text style={styles.infoCardValue}>{selectedAccount.country}</Text>
+              <Text style={styles.infoCardValue}>
+                {selectedAccount.iban 
+                  ? wiseService.getCountryName(wiseService.getCountryFromIban(selectedAccount.iban))
+                  : selectedAccount.country || 'N/A'}
+              </Text>
             </View>
 
             <View style={styles.infoCard}>
@@ -194,75 +198,11 @@ export default function AccountDetailsScreen() {
           </View>
         </View>
 
-        {/* IBAN Display */}
-        {selectedAccount.iban && (
-          <IbanDisplay
-            iban={selectedAccount.iban}
-            accountName={selectedAccount.name}
-            currency={selectedAccount.currency}
-            style={styles.ibanSection}
-          />
-        )}
-
-        {/* Banking Details */}
-        <View style={styles.modernSection}>
-          <View style={styles.sectionHeaderModern}>
-            <Text style={styles.sectionTitleModern}>Banking Details</Text>
-            <Ionicons name="lock-closed" size={20} color="#6B7280" />
-          </View>
-          
-          <View style={styles.bankingDetailsGrid}>
-            {selectedAccount.accountNumber && (
-              <View style={styles.bankingDetailCard}>
-                <View style={styles.bankingDetailHeader}>
-                  <Ionicons name="card-outline" size={16} color="#6B7280" />
-                  <Text style={styles.bankingDetailLabel}>Account Number</Text>
-                </View>
-                <Text style={styles.bankingDetailValue}>{selectedAccount.accountNumber}</Text>
-              </View>
-            )}
-
-            {selectedAccount.routingNumber && (
-              <View style={styles.bankingDetailCard}>
-                <View style={styles.bankingDetailHeader}>
-                  <Ionicons name="git-branch-outline" size={16} color="#6B7280" />
-                  <Text style={styles.bankingDetailLabel}>Routing Number</Text>
-                </View>
-                <Text style={styles.bankingDetailValue}>{selectedAccount.routingNumber}</Text>
-              </View>
-            )}
-
-            {selectedAccount.sortCode && (
-              <View style={styles.bankingDetailCard}>
-                <View style={styles.bankingDetailHeader}>
-                  <Ionicons name="keypad-outline" size={16} color="#6B7280" />
-                  <Text style={styles.bankingDetailLabel}>Sort Code</Text>
-                </View>
-                <Text style={styles.bankingDetailValue}>{selectedAccount.sortCode}</Text>
-              </View>
-            )}
-
-            {selectedAccount.bic && (
-              <View style={styles.bankingDetailCard}>
-                <View style={styles.bankingDetailHeader}>
-                  <Ionicons name="globe-outline" size={16} color="#6B7280" />
-                  <Text style={styles.bankingDetailLabel}>BIC/SWIFT</Text>
-                </View>
-                <Text style={styles.bankingDetailValue}>{selectedAccount.bic}</Text>
-              </View>
-            )}
-
-            {selectedAccount.bankName && (
-              <View style={[styles.bankingDetailCard, styles.fullWidthCard]}>
-                <View style={styles.bankingDetailHeader}>
-                  <Ionicons name="business-outline" size={16} color="#6B7280" />
-                  <Text style={styles.bankingDetailLabel}>Bank Name</Text>
-                </View>
-                <Text style={styles.bankingDetailValue}>{selectedAccount.bankName}</Text>
-              </View>
-            )}
-          </View>
-        </View>
+        {/* Comprehensive Banking Details */}
+        <ComprehensiveBankingDetails 
+          account={selectedAccount}
+          style={styles.bankingSection}
+        />
 
         {/* Recent Activity */}
         <View style={styles.modernSection}>
@@ -354,7 +294,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingVertical: 16,
     paddingBottom: 32,
   },
@@ -364,7 +304,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
@@ -600,44 +540,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // 🏦 Banking Details Grid
-  bankingDetailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  bankingDetailCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  fullWidthCard: {
-    minWidth: '100%',
-  },
-  bankingDetailHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  bankingDetailLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  bankingDetailValue: {
-    fontSize: 14,
-    color: '#1E3A8A',
-    fontWeight: '600',
-    fontFamily: 'monospace',
-  },
-  ibanSection: {
+  bankingSection: {
     marginBottom: 24,
   },
 

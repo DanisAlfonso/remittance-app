@@ -120,9 +120,10 @@ export default function EditProfileScreen() {
             
             <SimpleInput
               label="Country"
-              value={formData.country}
-              onChangeText={(text: string) => setFormData({ ...formData, country: text })}
-              placeholder="Enter your country"
+              value={user.country || 'Not provided'}
+              onChangeText={() => {}} // Read-only field for compliance
+              placeholder="Country"
+              style={styles.disabledInput}
             />
           </View>
         </View>

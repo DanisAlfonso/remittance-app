@@ -399,7 +399,7 @@ export default function DashboardScreen() {
                   <View style={styles.balanceMetadata}>
                     <Ionicons name="time-outline" size={12} color="#9CA3AF" />
                     <Text style={styles.balanceUpdatedModern}>
-                      {balance.cached ? 'Cached' : 'Updated'} • {new Date(balance.updatedAt).toLocaleTimeString()}
+                      Last updated • {new Date(balance.updatedAt).toLocaleTimeString()}
                     </Text>
                   </View>
                 </View>
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 24, // Perfect 8px grid spacing
+    paddingHorizontal: 16, // Reduced padding for wider cards
     paddingVertical: 16,
     paddingBottom: 32, // Extra bottom padding for comfort
   },

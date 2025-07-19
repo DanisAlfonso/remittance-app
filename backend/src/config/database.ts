@@ -8,6 +8,19 @@ declare global {
 
 if (process.env.NODE_ENV === 'production') {
   prisma = new PrismaClient();
+} else if (process.env.NODE_ENV === 'test') {
+  // Use test database configuration for integration tests
+  if (!global.__prisma) {
+    global.__prisma = new PrismaClient({
+      datasources: {
+        db: {
+          url: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL,
+        },
+      },
+      log: process.env.NODE_ENV === 'test' ? [] : ['query', 'info', 'warn', 'error'],
+    });
+  }
+  prisma = global.__prisma;
 } else {
   if (!global.__prisma) {
     global.__prisma = new PrismaClient({

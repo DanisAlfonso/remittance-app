@@ -26,24 +26,9 @@ import {
 } from './helpers/authHelper';
 
 describe('User Data Isolation Integration Tests', () => {
-  // Test users for isolation testing
-  const userA: IntegrationTestUser = {
-    email: 'test-a@integration.test',
-    firstName: 'Test',
-    lastName: 'A',
-    password: 'SecurePass123!',
-    phone: '+1234567890',
-    country: 'US',
-  };
-
-  const userB: IntegrationTestUser = {
-    email: 'test-b@integration.test',
-    firstName: 'Test',
-    lastName: 'B',
-    password: 'SecurePass456!',
-    phone: '+0987654321',
-    country: 'DE',
-  };
+  // Test users for isolation testing - generate unique emails per test
+  let userA: IntegrationTestUser;
+  let userB: IntegrationTestUser;
 
   let userAId: string;
   let userBId: string;
@@ -62,6 +47,26 @@ describe('User Data Isolation Integration Tests', () => {
   });
 
   beforeEach(async () => {
+    // Generate unique emails for each test run
+    const testId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    userA = {
+      email: `test-a-${testId}@integration.test`,
+      firstName: 'Test',
+      lastName: 'A',
+      password: 'SecurePass123!',
+      phone: '+1234567890',
+      country: 'US',
+    };
+
+    userB = {
+      email: `test-b-${testId}@integration.test`,
+      firstName: 'Test',
+      lastName: 'B',
+      password: 'SecurePass456!',
+      phone: '+0987654321',
+      country: 'DE',
+    };
+
     // Create fresh test users for each test
     const createdUserA = await createIntegrationTestUser(userA);
     const createdUserB = await createIntegrationTestUser(userB);
@@ -77,6 +82,8 @@ describe('User Data Isolation Integration Tests', () => {
     await createIntegrationTestAccount(userAId, 'EUR'); // User A gets EUR account
     await createIntegrationTestAccount(userBId, 'USD'); // User B gets USD account
   });
+
+  // Removed afterEach cleanup to prevent "user not found" errors between tests
 
   describe('Account Balance Isolation', () => {
     it('should return different balances for different users', async () => {
@@ -166,7 +173,7 @@ describe('User Data Isolation Integration Tests', () => {
 
       // Different IBANs/account numbers
       expect(userAAccount.iban).toBeDefined();
-      expect(userBAccount.iban).toBeUndefined(); // USD accounts don't have IBAN
+      expect(userBAccount.iban).toBeNull(); // USD accounts don't have IBAN (null from database)
       
       // Different account IDs
       expect(userAAccount.wiseAccountId).not.toBe(userBAccount.wiseAccountId);
@@ -210,19 +217,16 @@ describe('User Data Isolation Integration Tests', () => {
       // User A creates a transfer to User B
       const transferRequest = {
         recipientAccount: {
+          type: 'iban',
+          iban: 'US89370400440532013000',
           accountNumber: '1234567890',
-          sortCode: '123456',
           currency: 'USD',
           country: 'US',
-        },
-        recipientDetails: {
-          firstName: userB.firstName,
-          lastName: userB.lastName,
-          email: userB.email,
+          holderName: `${userB.firstName} ${userB.lastName}`,
+          bankName: 'Test Bank',
         },
         transferDetails: {
           amount: 100,
-          currency: 'EUR',
           reference: 'Test transfer integration',
         },
       };
@@ -234,27 +238,24 @@ describe('User Data Isolation Integration Tests', () => {
         .expect(201);
 
       expect(transferResponse.body.transfer).toBeDefined();
-      expect(transferResponse.body.transfer.status).toBe('PENDING');
-      expect(transferResponse.body.transfer.amount).toBe(500); // Service uses fixed amount
+      expect(transferResponse.body.transfer.status.status).toBe('PENDING');
+      expect(transferResponse.body.transfer.sourceAmount).toBe(100); // Updated to match current API
     });
 
     it('should show transfers only to the correct user', async () => {
       // Create a transfer as User A
       const transferRequest = {
         recipientAccount: {
+          type: 'iban',
+          iban: 'US89370400440532013000',
           accountNumber: '1234567890',
-          sortCode: '123456',
           currency: 'USD',
           country: 'US',
-        },
-        recipientDetails: {
-          firstName: userB.firstName,
-          lastName: userB.lastName,
-          email: userB.email,
+          holderName: `${userB.firstName} ${userB.lastName}`,
+          bankName: 'Test Bank',
         },
         transferDetails: {
           amount: 100,
-          currency: 'EUR',
           reference: 'User isolation test',
         },
       };

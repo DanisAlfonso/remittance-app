@@ -4,7 +4,7 @@ import { PrismaClient } from '../../../generated/prisma';
 export const integrationTestDb = new PrismaClient({
   datasources: {
     db: {
-      url: process.env.TEST_DATABASE_URL,
+      url: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL,
     },
   },
 });
@@ -40,13 +40,17 @@ export async function setupIntegrationTestDatabase() {
  */
 export async function cleanupIntegrationTestDatabase() {
   try {
-    // Clean up all data in reverse order of dependencies
-    await integrationTestDb.wiseTransaction.deleteMany({});
-    await integrationTestDb.wiseAccount.deleteMany({});
-    await integrationTestDb.session.deleteMany({});
-    await integrationTestDb.user.deleteMany({});
+    // Use transaction for faster cleanup
+    await integrationTestDb.$transaction(async (tx) => {
+      // Clean up all data in reverse order of dependencies
+      await tx.wiseTransaction.deleteMany({});
+      await tx.wiseAccount.deleteMany({});
+      await tx.session.deleteMany({});
+      await tx.user.deleteMany({});
+    });
   } catch (error) {
     console.error('Error cleaning up integration test database:', error);
+    // Non-critical error, don't throw to avoid breaking tests
   }
 }
 

@@ -483,12 +483,17 @@ export class TransferService {
   }
 
   /**
-   * Store transfer in database
+   * Store transfer in database with ATOMIC TRANSACTION for financial safety
+   * 🔒 CRITICAL: All financial operations must be atomic to prevent money loss
    */
   private async storeTransfer(transfer: Transfer, userId: string): Promise<boolean> {
-    try {
+    // 🚨 FINTECH SAFETY: Use database transaction to ensure atomicity
+    return await prisma.$transaction(async (tx) => {
+      console.log('🔒 Starting atomic financial transaction for transfer:', transfer.id);
+      
+      try {
       // Find sender's account and user information
-      const senderAccount = await prisma.wiseAccount.findFirst({
+      const senderAccount = await tx.wiseAccount.findFirst({
         where: {
           userId,
           currency: transfer.sourceCurrency,
@@ -508,13 +513,21 @@ export class TransferService {
         throw new Error('Source account not found');
       }
 
+      // 🛡️ FINANCIAL SAFETY: Check sufficient balance before proceeding
+      const currentBalance = Number(senderAccount.lastBalance || 0);
+      const totalDeduction = transfer.sourceAmount + transfer.fee;
+      
+      if (transfer.status.status === 'COMPLETED' && currentBalance < totalDeduction) {
+        throw new Error(`Insufficient balance: ${currentBalance} < ${totalDeduction}`);
+      }
+
       // Get sender's display name
       const senderName = senderAccount.user 
         ? `${senderAccount.user.firstName} ${senderAccount.user.lastName}`.trim() || senderAccount.user.email
         : 'App user';
 
-      // Store outgoing transaction for sender
-      await prisma.wiseTransaction.create({
+      // 1️⃣ Store outgoing transaction for sender (within transaction)
+      await tx.wiseTransaction.create({
         data: {
           id: transfer.id,
           wiseAccountId: senderAccount.id,
@@ -540,24 +553,25 @@ export class TransferService {
         },
       });
 
-      // Update sender's balance only if transfer is already completed
-      // For pending/processing transfers, balance will be updated when status changes to COMPLETED
+      // 2️⃣ Update sender's balance atomically if transfer is completed
       if (transfer.status.status === 'COMPLETED') {
-        const newSenderBalance = Number(senderAccount.lastBalance || 0) - (transfer.sourceAmount + transfer.fee);
-        await prisma.wiseAccount.update({
+        const newSenderBalance = currentBalance - totalDeduction;
+        await tx.wiseAccount.update({
           where: { id: senderAccount.id },
           data: {
             lastBalance: newSenderBalance,
             balanceUpdatedAt: new Date(),
           },
         });
-        console.log('💰 Updated sender balance (transfer completed):', {
+        console.log('💰 Updated sender balance atomically:', {
           senderId: senderAccount.id,
+          oldBalance: currentBalance,
+          deducted: totalDeduction,
           newBalance: newSenderBalance
         });
       }
 
-      // Find recipient's account by IBAN or account number
+      // 3️⃣ Find recipient's account by IBAN or account number (within transaction)
       let recipientAccount = null;
       
       console.log('🔍 Looking for recipient account:', {
@@ -568,7 +582,7 @@ export class TransferService {
       
       // Try to find by IBAN first
       if (transfer.recipient?.iban) {
-        recipientAccount = await prisma.wiseAccount.findFirst({
+        recipientAccount = await tx.wiseAccount.findFirst({
           where: {
             iban: transfer.recipient.iban,
             currency: transfer.targetCurrency,
@@ -580,7 +594,7 @@ export class TransferService {
       
       // If not found by IBAN, try by account number
       if (!recipientAccount && transfer.recipient?.accountNumber) {
-        recipientAccount = await prisma.wiseAccount.findFirst({
+        recipientAccount = await tx.wiseAccount.findFirst({
           where: {
             accountNumber: transfer.recipient.accountNumber,
             currency: transfer.targetCurrency,
@@ -593,7 +607,7 @@ export class TransferService {
       // If still not found, try to find any account with matching currency
       // This helps in development where account numbers might be different
       if (!recipientAccount) {
-        const allAccounts = await prisma.wiseAccount.findMany({
+        const allAccounts = await tx.wiseAccount.findMany({
           where: {
             currency: transfer.targetCurrency,
             status: 'ACTIVE',
@@ -618,7 +632,7 @@ export class TransferService {
           
           if (matchedAccount) {
             // Get the full account details including lastBalance
-            recipientAccount = await prisma.wiseAccount.findUnique({
+            recipientAccount = await tx.wiseAccount.findUnique({
               where: { id: matchedAccount.id }
             });
           }
@@ -626,7 +640,7 @@ export class TransferService {
         }
       }
 
-      // Create incoming transaction for recipient if found
+      // 4️⃣ Create incoming transaction for recipient if found (within transaction)
       if (recipientAccount) {
           console.log('✅ Creating incoming transaction for recipient (INTERNAL TRANSFER):', {
             recipientAccountId: recipientAccount.id,
@@ -634,8 +648,8 @@ export class TransferService {
             currency: transfer.targetCurrency
           });
           
-          // Store incoming transaction for recipient
-          await prisma.wiseTransaction.create({
+          // Store incoming transaction for recipient atomically
+          await tx.wiseTransaction.create({
             data: {
               id: `${transfer.id}_incoming`,
               wiseAccountId: recipientAccount.id,
@@ -654,21 +668,44 @@ export class TransferService {
             },
           });
 
-          // Note: Recipient balance will be updated when transfer status changes to COMPLETED
-          // via updateTransferStatus() method to avoid double-counting
+          // 5️⃣ Update recipient balance atomically if transfer is completed
+          if (transfer.status.status === 'COMPLETED') {
+            const currentRecipientBalance = Number(recipientAccount.lastBalance || 0);
+            const newRecipientBalance = currentRecipientBalance + transfer.targetAmount;
+            
+            await tx.wiseAccount.update({
+              where: { id: recipientAccount.id },
+              data: {
+                lastBalance: newRecipientBalance,
+                balanceUpdatedAt: new Date(),
+              },
+            });
+            
+            console.log('💰 Updated recipient balance atomically:', {
+              recipientId: recipientAccount.id,
+              oldBalance: currentRecipientBalance,
+              added: transfer.targetAmount,
+              newBalance: newRecipientBalance
+            });
+          }
           
-          console.log('📝 Incoming transaction created successfully');
+          console.log('✅ Atomic transaction completed successfully - money transfer is safe');
           
           // Return true to indicate this is an internal transfer
           return true;
       } else {
         console.log('❌ No recipient account found - external bank transfer');
+        console.log('✅ Atomic transaction completed successfully - sender debit recorded');
         return false;
       }
     } catch (error) {
-      console.error('Error storing transfer:', error);
+      console.error('Error in atomic transfer transaction:', error);
       throw error;
     }
+    }, {
+      // 🚨 FINTECH SAFETY: Set transaction timeout to prevent hanging
+      timeout: 30000, // 30 seconds
+    });
   }
 
   /**
@@ -708,12 +745,17 @@ export class TransferService {
   }
 
   /**
-   * Update transfer status
+   * Update transfer status with ATOMIC TRANSACTION for financial safety
+   * 🔒 CRITICAL: Status updates that affect balances must be atomic
    */
   private async updateTransferStatus(transferId: string, status: string): Promise<void> {
-    try {
-      // Update outgoing transaction
-      await prisma.wiseTransaction.update({
+    // 🚨 FINTECH SAFETY: Use atomic transaction for all status updates
+    await prisma.$transaction(async (tx) => {
+      console.log('🔒 Starting atomic status update for transfer:', transferId, 'to status:', status);
+      
+      try {
+      // 1️⃣ Update outgoing transaction status
+      await tx.wiseTransaction.update({
         where: { id: transferId },
         data: {
           status,
@@ -722,9 +764,9 @@ export class TransferService {
         },
       });
 
-      // Update corresponding incoming transaction
+      // 2️⃣ Update corresponding incoming transaction status
       const incomingTxId = `${transferId}_incoming`;
-      await prisma.wiseTransaction.updateMany({
+      await tx.wiseTransaction.updateMany({
         where: { id: incomingTxId },
         data: {
           status,
@@ -733,56 +775,76 @@ export class TransferService {
         },
       });
 
-      // If transfer completed, update both sender and recipient balances
+      // 3️⃣ If transfer completed, update balances atomically
       if (status === 'COMPLETED') {
-        // Update sender balance (deduct amount + fee)
-        const outgoingTx = await prisma.wiseTransaction.findFirst({
+        // Get both transactions with account details
+        const outgoingTx = await tx.wiseTransaction.findFirst({
           where: { id: transferId },
           include: { wiseAccount: true },
         });
 
-        if (outgoingTx && Number(outgoingTx.amount) < 0) { // Outgoing transaction (negative amount)
+        const incomingTx = await tx.wiseTransaction.findFirst({
+          where: { id: incomingTxId },
+          include: { wiseAccount: true },
+        });
+
+        // 4️⃣ Update sender balance atomically (only if not already done)
+        if (outgoingTx && Number(outgoingTx.amount) < 0) {
+          const currentBalance = Number(outgoingTx.wiseAccount.lastBalance || 0);
           const deductAmount = Math.abs(Number(outgoingTx.amount)) + Number(outgoingTx.fee || 0);
-          const newSenderBalance = Number(outgoingTx.wiseAccount.lastBalance || 0) - deductAmount;
-          await prisma.wiseAccount.update({
+          
+          // 🛡️ FINANCIAL SAFETY: Prevent negative balances
+          if (currentBalance < deductAmount) {
+            throw new Error(`Insufficient balance for completion: ${currentBalance} < ${deductAmount}`);
+          }
+          
+          const newSenderBalance = currentBalance - deductAmount;
+          
+          await tx.wiseAccount.update({
             where: { id: outgoingTx.wiseAccountId },
             data: {
               lastBalance: newSenderBalance,
               balanceUpdatedAt: new Date(),
             },
           });
-          console.log('💳 Updated sender balance on completion:', {
+          console.log('💳 Updated sender balance atomically on completion:', {
             senderId: outgoingTx.wiseAccountId,
+            oldBalance: currentBalance,
             deducted: deductAmount,
             newBalance: newSenderBalance
           });
         }
 
-        // Update recipient balance (add amount)
-        const incomingTx = await prisma.wiseTransaction.findFirst({
-          where: { id: incomingTxId },
-          include: { wiseAccount: true },
-        });
-
+        // 5️⃣ Update recipient balance atomically
         if (incomingTx) {
-          const newRecipientBalance = Number(incomingTx.wiseAccount.lastBalance || 0) + Number(incomingTx.amount);
-          await prisma.wiseAccount.update({
+          const currentRecipientBalance = Number(incomingTx.wiseAccount.lastBalance || 0);
+          const newRecipientBalance = currentRecipientBalance + Number(incomingTx.amount);
+          
+          await tx.wiseAccount.update({
             where: { id: incomingTx.wiseAccountId },
             data: {
               lastBalance: newRecipientBalance,
               balanceUpdatedAt: new Date(),
             },
           });
-          console.log('💰 Updated recipient balance on completion:', {
+          console.log('💰 Updated recipient balance atomically on completion:', {
             recipientId: incomingTx.wiseAccountId,
+            oldBalance: currentRecipientBalance,
             added: Number(incomingTx.amount),
             newBalance: newRecipientBalance
           });
         }
       }
+      
+      console.log('✅ Atomic status update completed successfully');
     } catch (error) {
-      console.error('Error updating transfer status:', error);
+      console.error('Error in atomic status update:', error);
+      throw error;
     }
+    }, {
+      // 🚨 FINTECH SAFETY: Set transaction timeout
+      timeout: 30000, // 30 seconds
+    });
   }
 
   /**

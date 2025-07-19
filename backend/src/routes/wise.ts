@@ -247,6 +247,7 @@ const getAccountsHandler: RequestHandler = async (req: AuthRequest, res: Respons
       },
       select: {
         id: true,
+        wiseAccountId: true, // Added for integration tests
         currency: true,
         country: true,
         accountType: true,
@@ -277,6 +278,53 @@ const getAccountsHandler: RequestHandler = async (req: AuthRequest, res: Respons
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to retrieve accounts',
+    });
+  }
+};
+
+/**
+ * GET /api/v1/wise/balance
+ * Get balance for user's primary account (first active account)
+ */
+const getBalanceHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    
+    // Find user's first active account
+    const account = await prisma.wiseAccount.findFirst({
+      where: {
+        userId,
+        status: 'ACTIVE',
+      },
+      orderBy: {
+        createdAt: 'asc', // First created account
+      },
+    });
+    
+    if (!account) {
+      res.status(404).json({
+        error: 'No account found',
+        message: 'No active Wise account found for this user',
+      });
+      return;
+    }
+    
+    // Return cached balance (sandbox mode)
+    res.json({
+      message: 'Balance retrieved successfully',
+      balance: {
+        amount: account.lastBalance,
+        currency: account.currency,
+        updatedAt: account.balanceUpdatedAt,
+        cached: true,
+        accountId: account.id,
+      },
+    });
+  } catch (error) {
+    console.error('Get balance error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to retrieve balance',
     });
   }
 };
@@ -776,6 +824,7 @@ const simulateTransferStatusHandler: RequestHandler = async (req: AuthRequest, r
 router.get('/test-connectivity', testConnectivityHandler);
 router.get('/auth/url', getAuthUrlHandler);
 router.post('/auth/callback', authCallbackHandler);
+router.get('/balance', getBalanceHandler);
 router.post('/accounts', createAccountHandler);
 router.get('/accounts', getAccountsHandler);
 router.get('/accounts/:id/balance', getAccountBalanceHandler);

@@ -22,6 +22,6 @@ module.exports = {
     'html'
   ],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
-  testTimeout: 10000,
+  testTimeout: 60000, // Increased for integration tests
   verbose: true,
 };

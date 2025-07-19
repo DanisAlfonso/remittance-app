@@ -44,6 +44,33 @@ A secure, modern fintech remittance application built with React Native (Expo) a
 - **Transactions**: Transaction history and status tracking
 - **Beneficiaries**: Recipient management for transfers
 
+### 🔒 **FINANCIAL SAFETY IMPLEMENTATIONS**
+
+#### **Atomic Money Transfers** ✅
+- All transfer operations use `prisma.$transaction()` 
+- Prevents money disappearing if system crashes mid-transfer
+- Includes balance validation and rollback on errors
+- Files: `src/services/transfer.ts:489` (storeTransfer), `src/services/transfer.ts:751` (updateTransferStatus)
+
+#### **Database Financial Constraints** ✅  
+- `positive_balance_check`: Prevents negative account balances
+- `non_zero_amount_check`: Blocks zero-amount transactions
+- `positive_transfer_amount_check`: Ensures positive transfer amounts
+- `non_negative_fee_check`: Validates all fees are non-negative
+- Applied via migration: `20250719115548_add_financial_safety_constraints`
+
+#### **Production-Safe Migrations** ✅
+- Proper Prisma migration system implemented
+- Dangerous `--force-reset` commands removed
+- Production deployment script with confirmation: `scripts/deploy-production-migrations.sh`
+- Safe test setup script: `scripts/setup-test-db.sh`
+
+#### **Database Backup System** ✅
+- Automated backup script: `scripts/create-database-backup.sh`
+- Compressed backups with integrity verification
+- 30-day retention policy
+- Ready for cloud storage integration
+
 ## API Endpoints
 
 ### Authentication
@@ -51,25 +78,72 @@ A secure, modern fintech remittance application built with React Native (Expo) a
 - `POST /api/v1/auth/login` - User login
 - `GET /health` - Health check endpoint
 
-## Development Standards & Quality Assurance
+## 🚨 **FINTECH SAFETY REQUIREMENTS - CRITICAL** 🚨
+
+### 🛡️ **FINANCIAL DATA PROTECTION - MANDATORY**
+
+**🔒 ALL financial operations MUST follow these requirements:**
+
+#### **1. ATOMIC TRANSACTIONS (CRITICAL)**
+```typescript
+// ✅ CORRECT: All money movements must be atomic
+await prisma.$transaction(async (tx) => {
+  await tx.wiseAccount.update({ /* debit sender */ });
+  await tx.wiseAccount.update({ /* credit recipient */ });
+  await tx.wiseTransaction.create({ /* log transaction */ });
+});
+
+// ❌ FORBIDDEN: Separate operations can cause money loss
+await prisma.wiseAccount.update({ /* debit */ });
+// 💥 IF CRASH HERE, MONEY DISAPPEARS! 💥
+await prisma.wiseAccount.update({ /* credit */ });
+```
+
+#### **2. DATABASE MIGRATIONS (CRITICAL)**
+```bash
+# ✅ SAFE: Use proper migrations
+npx prisma migrate dev --name "feature_name"
+npx prisma migrate deploy  # Production
+
+# 🚨 FORBIDDEN: NEVER use --force-reset in production
+# npx prisma db push --force-reset  # DESTROYS ALL DATA!
+```
+
+#### **3. FINANCIAL CONSTRAINTS (CRITICAL)**
+- **Negative balances BLOCKED** by database constraints
+- **Zero transactions BLOCKED** by database constraints  
+- **All fees must be non-negative**
+- **Exchange rates must be positive**
+
+#### **4. BACKUP REQUIREMENTS (CRITICAL)**
+- **Automated daily backups** with verification
+- **Point-in-time recovery** capabilities
+- **Cross-region replication** for disaster recovery
+- **Regular restore testing** (monthly minimum)
 
 ### 🎯 **MANDATORY WORKFLOW FOR ALL CODE CHANGES**
 
 **After ANY code modification, creation, or generation, Claude Code MUST:**
 
-1. **Code Quality Check**:
+1. **Financial Safety Check**:
+   - ✅ Are all money movements in `$transaction()`?
+   - ✅ Are database constraints preventing negative balances?
+   - ✅ Are migrations used instead of `--force-reset`?
+   - ✅ Are backups working and tested?
+
+2. **Code Quality Check**:
    ```bash
    npm run lint        # Fix all linting issues
    npm run typecheck   # Ensure no TypeScript errors
    npm run build       # Verify successful compilation
    ```
 
-2. **Test Verification**:
+3. **Test Verification**:
    ```bash
    npm test           # Run ALL tests - must be 100% passing
    ```
 
-3. **New Functionality Requirements**:
+4. **New Functionality Requirements**:
    - Write comprehensive unit tests for ALL new functions/features
    - Achieve 100% test coverage for critical paths
    - Include edge cases and error scenarios

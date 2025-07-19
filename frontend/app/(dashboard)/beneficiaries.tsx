@@ -41,7 +41,6 @@ interface RecentRecipient {
 export default function BeneficiariesScreen() {
   const { token } = useAuthStore();
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
-  const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'recent' | 'all'>('recent');
@@ -51,7 +50,9 @@ export default function BeneficiariesScreen() {
   }, []);
 
   const loadBeneficiaries = async () => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     
     setIsLoading(true);
     try {
@@ -116,7 +117,7 @@ export default function BeneficiariesScreen() {
       const recipients = Array.from(recipientMap.values())
         .sort((a, b) => b.transferCount - a.transferCount);
       
-      setRecentRecipients(recipients);
+      // setRecentRecipients(recipients);
       
       // Convert recent recipients to beneficiary format for unified display
       const beneficiariesFromRecents: Beneficiary[] = recipients.map(recipient => ({
@@ -186,7 +187,9 @@ export default function BeneficiariesScreen() {
   };
 
   const filteredBeneficiaries = beneficiaries.filter(beneficiary => {
-    if (!searchQuery) return true;
+    if (!searchQuery) {
+      return true;
+    }
     const query = searchQuery.toLowerCase();
     return (
       beneficiary.firstName.toLowerCase().includes(query) ||

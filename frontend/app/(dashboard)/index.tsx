@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
 import { wiseService } from '../../lib/wise';
 import { transferService } from '../../lib/transfer';
 import type { Transfer } from '../../types/transfer';
 import { apiClient } from '../../lib/api';
-import Button from '../../components/ui/Button';
 import ProfileCircle from '../../components/ui/ProfileCircle';
+
 
 export default function DashboardScreen() {
   const { user, token, logout } = useAuthStore();
@@ -162,9 +163,6 @@ export default function DashboardScreen() {
     return 'Recipient';
   };
 
-  const getTransferDescription = (transfer: Transfer): string => {
-    return transfer.description || transfer.reference || 'Bank transfer';
-  };
 
 
   useEffect(() => {
@@ -277,122 +275,188 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Header with Welcome Message and Profile Circle */}
-        <View style={styles.headerContainer}>
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeMessage}>Welcome back</Text>
-            <Text style={styles.userDisplayName}>
-              {user.firstName && user.lastName 
-                ? `${user.firstName} ${user.lastName}` 
-                : user.firstName || user.email.split('@')[0]
-              }
-            </Text>
-          </View>
-          <View style={styles.profileSection}>
-            <ProfileCircle
-              firstName={user.firstName}
-              lastName={user.lastName}
-              email={user.email}
-              photoUrl={user.photoUrl}
-              size={50}
+        {/* Premium Header with Luxurious Spacing */}
+        <View style={styles.premiumHeader}>
+          <View style={styles.headerContent}>
+            <View style={styles.welcomeContainer}>
+              <Text style={styles.timeGreeting}>
+                {new Date().getHours() < 12 ? 'Good morning' : 
+                 new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}
+              </Text>
+              <Text style={styles.userDisplayName}>
+                {user.firstName && user.lastName 
+                  ? `${user.firstName} ${user.lastName}` 
+                  : user.firstName || user.email.split('@')[0]
+                }
+              </Text>
+            </View>
+            <Pressable 
+              style={styles.profilePressable}
               onPress={() => router.push('/(dashboard)/profile')}
-            />
+            >
+              <ProfileCircle
+                firstName={user.firstName}
+                lastName={user.lastName}
+                email={user.email}
+                photoUrl={user.photoUrl}
+                size={56}
+                backgroundColor="#3B82F6"
+              />
+              <View style={styles.notificationDot} />
+            </Pressable>
           </View>
         </View>
 
-        {/* Total Balance Section - Real Account Balance */}
+        {/* Premium Balance Card - Hero Section */}
         {selectedAccount && balance && accounts.length > 0 && (
-          <View style={styles.totalBalanceSection}>
-            <Text style={styles.totalBalanceLabel}>Total Balance</Text>
-            <Text style={styles.totalBalanceAmount}>
-              {wiseService.formatAmount(balance.amount, selectedAccount.currency)}
-            </Text>
+          <View style={styles.balanceHeroCard}>
+            <View style={styles.balanceCardHeader}>
+              <Text style={styles.balanceCardTitle}>Total Balance</Text>
+            </View>
             
-            <Text style={styles.lastUpdatedText}>
-              Last updated: {lastRefreshTime ? lastRefreshTime.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              }) : balance.updatedAt ? new Date(balance.updatedAt).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              }) : 'Never'}
-            </Text>
-            <View style={styles.balanceActions}>
-              <TouchableOpacity 
-                style={styles.balanceActionButton}
+            <View style={styles.balanceDisplay}>
+              <Text style={styles.balanceAmount}>
+                {wiseService.formatAmount(balance.amount, selectedAccount.currency)}
+              </Text>
+              <View style={styles.balanceSubInfo}>
+                <Ionicons name="time-outline" size={12} color="#6B7280" />
+                <Text style={styles.lastUpdatedText}>
+                  Updated {lastRefreshTime ? lastRefreshTime.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  }) : balance.updatedAt ? new Date(balance.updatedAt).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  }) : 'Never'}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.quickActionsGrid}>
+              <Pressable 
+                style={[styles.actionButton, styles.primaryAction]}
                 onPress={() => router.push('/(dashboard)/send-money')}
               >
-                <Text style={styles.balanceActionText}>Transfer</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.balanceActionButton}>
-                <Text style={styles.balanceActionText}>Add Money</Text>
-              </TouchableOpacity>
+                <View style={styles.actionIconContainer}>
+                  <Ionicons name="paper-plane" size={24} color="#FFFFFF" />
+                </View>
+                <Text style={styles.actionButtonText}>Send Money</Text>
+              </Pressable>
+              
+              <Pressable style={[styles.actionButton, styles.secondaryAction]}>
+                <View style={[styles.actionIconContainer, styles.secondaryIconContainer]}>
+                  <Ionicons name="add" size={24} color="#3B82F6" />
+                </View>
+                <Text style={[styles.actionButtonText, styles.secondaryActionText]}>Add Money</Text>
+              </Pressable>
+              
+              <Pressable style={[styles.actionButton, styles.secondaryAction]}>
+                <View style={[styles.actionIconContainer, styles.secondaryIconContainer]}>
+                  <Ionicons name="card" size={24} color="#3B82F6" />
+                </View>
+                <Text style={[styles.actionButtonText, styles.secondaryActionText]}>Cards</Text>
+              </Pressable>
             </View>
           </View>
         )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Digital Wallet</Text>
+        <View style={styles.modernSection}>
+          <View style={styles.sectionHeaderModern}>
+            <Text style={styles.sectionTitleModern}>Digital Wallet</Text>
+            {selectedAccount && balance && (
+              <Pressable
+                onPress={() => router.push('/(dashboard)/account-details')}
+                style={styles.viewAllButtonModern}
+              >
+                <Text style={styles.viewAllTextModern}>Details</Text>
+                <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
+              </Pressable>
+            )}
+          </View>
+          
           {selectedAccount && balance ? (
-            <View style={styles.walletGroup}>
-              <View style={styles.accountSummary}>
-                <Text style={styles.accountSummaryTitle}>Account Summary</Text>
-                <Text style={styles.accountSummaryAmount}>
-                  {wiseService.formatAmount(balance.amount, selectedAccount.currency)}
-                </Text>
-                <Text style={styles.balanceUpdated}>
-                  {balance.cached ? 'Cached' : 'Updated'} • {new Date(balance.updatedAt).toLocaleTimeString()}
-                </Text>
-              </View>
-              
-              <View style={styles.accountInfo}>
-                <Text style={styles.accountName}>{selectedAccount.name}</Text>
-                <Text style={styles.accountType}>
-                  {wiseService.getAccountTypeDisplayName(selectedAccount.type)}
-                </Text>
-                {selectedAccount.iban && (
-                  <Text style={styles.accountIban}>
-                    IBAN: {wiseService.formatIban(selectedAccount.iban)}
+            <View style={styles.modernWalletContent}>
+              <View style={styles.modernAccountSummary}>
+                <View style={styles.summaryHeader}>
+                  <View style={styles.accountIconContainer}>
+                    <Ionicons name="card" size={24} color="#3B82F6" />
+                  </View>
+                  <View style={styles.summaryInfo}>
+                    <Text style={styles.accountNameModern}>{selectedAccount.name}</Text>
+                    <Text style={styles.accountTypeModern}>
+                      {wiseService.getAccountTypeDisplayName(selectedAccount.type)}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.balanceSection}>
+                  <Text style={styles.balanceLabelModern}>Available Balance</Text>
+                  <Text style={styles.balanceAmountModern}>
+                    {wiseService.formatAmount(balance.amount, selectedAccount.currency)}
                   </Text>
+                  <View style={styles.balanceMetadata}>
+                    <Ionicons name="time-outline" size={12} color="#9CA3AF" />
+                    <Text style={styles.balanceUpdatedModern}>
+                      {balance.cached ? 'Cached' : 'Updated'} • {new Date(balance.updatedAt).toLocaleTimeString()}
+                    </Text>
+                  </View>
+                </View>
+                
+                {selectedAccount.iban && (
+                  <View style={styles.ibanContainer}>
+                    <Text style={styles.ibanLabel}>IBAN</Text>
+                    <Text style={styles.ibanValueModern}>
+                      {wiseService.formatIban(selectedAccount.iban)}
+                    </Text>
+                  </View>
                 )}
-                <Button
-                  title="View Full Details"
-                  onPress={() => router.push('/(dashboard)/account-details')}
-                  variant="outline"
-                  style={styles.detailsButton}
-                />
               </View>
             </View>
           ) : accounts.length > 0 ? (
-            <View style={styles.overviewGroup}>
-              <Text style={styles.emptyStateTitle}>
-                {accounts.length} Account{accounts.length > 1 ? 's' : ''}
+            <View style={styles.modernEmptyState}>
+              <View style={styles.emptyStateIconContainer}>
+                <Ionicons name="wallet" size={48} color="#D1D5DB" />
+              </View>
+              <Text style={styles.emptyStateTitleModern}>
+                {accounts.length} Account{accounts.length > 1 ? 's' : ''} Available
               </Text>
-              <Text style={styles.emptyStateText}>
-                Select an account to view balance
+              <Text style={styles.emptyStateTextModern}>
+                Select an account to view balance and start managing your digital wallet
               </Text>
-              {accounts.map((account) => (
-                <Button
-                  key={account.id}
-                  title={`Select ${account.name} (${account.currency})`}
-                  onPress={() => selectAccount(account.id)}
-                  style={styles.selectAccountButton}
-                />
-              ))}
+              <View style={styles.accountSelectionGrid}>
+                {accounts.map((account) => (
+                  <Pressable
+                    key={account.id}
+                    style={styles.accountSelectionCard}
+                    onPress={() => selectAccount(account.id)}
+                  >
+                    <View style={styles.accountCardIcon}>
+                      <Ionicons name="card-outline" size={20} color="#3B82F6" />
+                    </View>
+                    <Text style={styles.accountCardName}>{account.name}</Text>
+                    <Text style={styles.accountCardCurrency}>{account.currency}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           ) : (
-            <View style={styles.overviewGroup}>
-              <Text style={styles.emptyStateTitle}>No Digital Account</Text>
-              <Text style={styles.emptyStateText}>
+            <View style={styles.modernEmptyState}>
+              <View style={styles.emptyStateIconContainer}>
+                <Ionicons name="add-circle" size={48} color="#D1D5DB" />
+              </View>
+              <Text style={styles.emptyStateTitleModern}>No Digital Account</Text>
+              <Text style={styles.emptyStateTextModern}>
                 Create a digital account to start using virtual IBANs for international transfers
               </Text>
-              <Button
-                title="Create Digital Account"
+              <Pressable 
+                style={styles.createAccountButtonModern}
                 onPress={() => router.push('/(dashboard)/create-account')}
-                style={styles.createAccountButton}
-              />
+              >
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+                <Text style={styles.createAccountTextModern}>Create Digital Account</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -416,64 +480,89 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <View style={styles.modernSection}>
+          <View style={styles.sectionHeaderModern}>
+            <Text style={styles.sectionTitleModern}>Recent Activity</Text>
             {recentTransfers.length > 0 && (
-              <TouchableOpacity
+              <Pressable
                 onPress={() => router.push('/(dashboard)/transactions')}
-                style={styles.viewAllButton}
+                style={styles.viewAllButtonModern}
               >
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
+                <Text style={styles.viewAllTextModern}>View All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
+              </Pressable>
             )}
           </View>
           
           {isLoadingTransfers ? (
-            <View style={styles.activityGroup}>
-              <Text style={styles.emptyStateText}>Loading recent activity...</Text>
+            <View style={styles.loadingContainer}>
+              <View style={styles.loadingIndicator}>
+                <Ionicons name="sync" size={24} color="#3B82F6" />
+              </View>
+              <Text style={styles.loadingText}>Loading your recent activity...</Text>
             </View>
           ) : recentTransfers.length > 0 ? (
-            <View style={styles.activityList}>
+            <View style={styles.activityContainer}>
               {recentTransfers.map((transfer) => {
                 const transferType = getTransferType(transfer);
                 const recipientName = getRecipientName(transfer);
                 const amount = Math.abs(Number(transfer.sourceAmount) || 0);
                 
                 return (
-                  <View key={transfer.id} style={styles.activityItem}>
-                    <View style={styles.activityInfo}>
-                      <Text style={styles.activityType}>
-                        {transferType === 'send' ? 'Sent to' : 'Received from'}
+                  <Pressable key={transfer.id} style={styles.modernActivityItem}>
+                    <View style={styles.activityIconContainer}>
+                      <View style={[
+                        styles.activityIcon,
+                        { backgroundColor: transferType === 'send' ? '#EEF2FF' : '#ECFDF5' }
+                      ]}>
+                        <Ionicons 
+                          name={transferType === 'send' ? 'arrow-up' : 'arrow-down'} 
+                          size={20} 
+                          color={transferType === 'send' ? '#3B82F6' : '#10B981'} 
+                        />
+                      </View>
+                    </View>
+                    
+                    <View style={styles.activityDetails}>
+                      <Text style={styles.activityRecipientModern}>{recipientName}</Text>
+                      <Text style={styles.activityTypeModern}>
+                        {transferType === 'send' ? 'Money sent' : 'Money received'}
                       </Text>
-                      <Text style={styles.activityRecipient}>{recipientName}</Text>
-                      <Text style={styles.activityDescription}>
-                        {getTransferDescription(transfer)}
-                      </Text>
-                      <Text style={styles.activityDate}>
+                      <Text style={styles.activityDateModern}>
                         {new Date(transfer.createdAt).toLocaleDateString('en-US', {
                           month: 'short',
-                          day: 'numeric'
+                          day: 'numeric',
+                          year: new Date(transfer.createdAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
                         })}
                       </Text>
                     </View>
-                    <View style={styles.activityAmount}>
+                    
+                    <View style={styles.activityAmountContainer}>
                       <Text style={[
-                        styles.activityAmountText,
-                        { color: transferType === 'send' ? '#6b7280' : '#059669' }
+                        styles.activityAmountModern,
+                        { color: transferType === 'send' ? '#6B7280' : '#10B981' }
                       ]}>
                         {transferType === 'send' ? '-' : '+'}${amount.toFixed(2)}
                       </Text>
-                      <Text style={styles.activityCurrency}>{transfer.sourceCurrency}</Text>
+                      <Text style={styles.activityCurrencyModern}>{transfer.sourceCurrency}</Text>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
           ) : (
-            <View style={styles.activityGroup}>
-              <Text style={styles.emptyStateTitle}>No recent activity</Text>
-              <Text style={styles.emptyStateText}>Your transaction history will appear here</Text>
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyStateIconContainer}>
+                <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
+              </View>
+              <Text style={styles.emptyStateTitleModern}>No recent activity</Text>
+              <Text style={styles.emptyStateTextModern}>Your transaction history will appear here once you start sending money</Text>
+              <Pressable 
+                style={styles.emptyStateButton}
+                onPress={() => router.push('/(dashboard)/send-money')}
+              >
+                <Text style={styles.emptyStateButtonText}>Send Your First Transfer</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -488,143 +577,333 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  // 🎨 Base Container - Premium Background
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8FAFC', // Sophisticated light gray
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 24, // Perfect 8px grid spacing
     paddingVertical: 16,
+    paddingBottom: 32, // Extra bottom padding for comfort
   },
-  // Header Container - Balanced Layout
-  headerContainer: {
+
+  // 🌟 Premium Header Design
+  premiumHeader: {
+    marginBottom: 32, // Generous spacing
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  welcomeContainer: {
+    flex: 1,
+  },
+  timeGreeting: {
+    fontSize: 16, // Body size from design system
+    color: '#6B7280', // Sophisticated gray
+    fontWeight: '500',
+    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  userDisplayName: {
+    fontSize: 24, // Between H2 and H3 for perfect hierarchy
+    fontWeight: '700', // Bold for impact
+    color: '#1E3A8A', // Primary dark blue from design system
+    letterSpacing: -0.5, // Tight spacing for premium feel
+  },
+  profilePressable: {
+    position: 'relative',
+    padding: 4, // Touch target enhancement
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#EF4444', // Error red for notifications
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  // 💎 Premium Balance Hero Card
+  balanceHeroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24, // Extra rounded for premium feel
+    padding: 32, // Luxurious spacing
+    marginBottom: 32,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  balanceCardHeader: {
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  balanceCardTitle: {
+    fontSize: 16, // Body size
+    color: '#6B7280',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  balanceDisplay: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  balanceAmount: {
+    fontSize: 40, // Display size for impact
+    fontWeight: '800',
+    color: '#1E3A8A', // Primary dark
+    letterSpacing: -1,
+    marginBottom: 8,
+  },
+  balanceSubInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  lastUpdatedText: {
+    fontSize: 12, // Small size
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    gap: 16, // Perfect spacing
+  },
+  actionButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    minHeight: 80,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  primaryAction: {
+    backgroundColor: '#3B82F6', // Primary blue
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  secondaryAction: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  actionIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryIconContainer: {
+    backgroundColor: '#EEF2FF',
+  },
+  actionButtonText: {
+    fontSize: 12, // Small but readable
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  secondaryActionText: {
+    color: '#3B82F6',
+  },
+  // 🏗️ Modern Section Design  
+  modernSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20, // Generous rounding
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  sectionHeaderModern: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
-    paddingHorizontal: 4,
   },
-  welcomeSection: {
-    flex: 1,
+  sectionTitleModern: {
+    fontSize: 20, // H3 size from design system
+    fontWeight: '700',
+    color: '#1E3A8A',
+    letterSpacing: -0.3,
   },
-  welcomeMessage: {
-    fontSize: 16,
-    color: '#6c757d',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  userDisplayName: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  profileSection: {
-    alignItems: 'center',
-  },
-  // Total Balance Section - Wise Style
-  totalBalanceSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    alignItems: 'center',
-  },
-  totalBalanceLabel: {
-    fontSize: 16,
-    color: '#6c757d',
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  totalBalanceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 8,
-  },
-  lastUpdatedText: {
-    fontSize: 12,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  balanceActions: {
+  viewAllButtonModern: {
     flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  balanceActionButton: {
-    flex: 1,
-    backgroundColor: '#00D26A',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    gap: 4,
   },
-  balanceActionText: {
-    fontSize: 16,
+  viewAllTextModern: {
+    fontSize: 14, // Caption size
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#3B82F6',
   },
-  // Updated wallet styles
-  accountSummary: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-  },
-  accountSummaryTitle: {
-    fontSize: 14,
-    color: '#6c757d',
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  accountSummaryAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 4,
-  },
-  header: {
+
+  // 🔄 Loading States
+  loadingContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    paddingVertical: 48,
+    gap: 16,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333333',
+  loadingIndicator: {
+    padding: 16,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+
+  // 📱 Modern Activity Items
+  activityContainer: {
+    gap: 12, // Perfect spacing between items
+  },
+  modernActivityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    gap: 16,
+  },
+  activityIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  activityRecipientModern: {
+    fontSize: 16, // Body size
+    fontWeight: '600',
+    color: '#1E3A8A',
+    marginBottom: 2,
+  },
+  activityTypeModern: {
+    fontSize: 14, // Caption size
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  activityDateModern: {
+    fontSize: 12, // Small size
+    color: '#9CA3AF',
+    fontWeight: '400',
+  },
+  activityAmountContainer: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  activityAmountModern: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  activityCurrencyModern: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+
+  // 🎭 Beautiful Empty States
+  emptyStateContainer: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    gap: 16,
+  },
+  emptyStateIconContainer: {
+    padding: 20,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#F1F5F9',
     marginBottom: 8,
   },
-  welcomeText: {
-    fontSize: 18,
-    color: '#6c757d',
+  emptyStateTitleModern: {
+    fontSize: 18, // Between body and H3
+    fontWeight: '600',
+    color: '#374151',
     textAlign: 'center',
-    marginBottom: 4,
   },
-  section: {
-    backgroundColor: '#ffffff',
+  emptyStateTextModern: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 12,
+    marginTop: 8,
+  },
+  emptyStateButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // 🏛️ Legacy Section Support (for gradual migration)
+  section: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 20,
     marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333333',
+    color: '#1E3A8A',
     marginBottom: 16,
   },
+  // 📊 Enhanced Legacy Support with Modern Touches
   overviewGroup: {
     gap: 16,
   },
@@ -632,80 +911,81 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   statusLabel: {
     fontSize: 16,
-    color: '#6c757d',
+    color: '#6B7280',
     fontWeight: '500',
   },
   statusValue: {
     fontSize: 16,
-    color: '#333333',
-    fontWeight: '400',
+    color: '#1E3A8A',
+    fontWeight: '600',
   },
-  activityGroup: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyStateTitle: {
-    fontSize: 16,
-    color: '#6c757d',
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#6c757d',
-    textAlign: 'center',
-  },
+  
+  // 💳 Wallet & Account Styles  
   walletGroup: {
     gap: 16,
   },
-  balanceCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
+  accountSummary: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  balanceLabel: {
-    fontSize: 16,
-    color: '#6c757d',
-    fontWeight: '500',
+  accountSummaryTitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
     marginBottom: 8,
+    letterSpacing: 0.5,
   },
-  balanceAmount: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333333',
+  accountSummaryAmount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1E3A8A',
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   balanceUpdated: {
     fontSize: 12,
-    color: '#6c757d',
-    fontWeight: '400',
+    color: '#6B7280',
+    fontWeight: '500',
   },
   accountInfo: {
-    gap: 4,
+    gap: 8,
   },
   accountName: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333333',
+    fontWeight: '700',
+    color: '#1E3A8A',
   },
   accountType: {
     fontSize: 14,
-    color: '#6c757d',
-    fontWeight: '400',
+    color: '#6B7280',
+    fontWeight: '500',
   },
   accountIban: {
     fontSize: 14,
-    color: '#6c757d',
-    fontWeight: '400',
+    color: '#6B7280',
+    fontWeight: '500',
     fontFamily: 'monospace',
+    backgroundColor: '#F1F5F9',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 4,
   },
+  
+  // 🎯 Enhanced Buttons
   createAccountButton: {
     marginTop: 16,
   },
@@ -713,76 +993,185 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   detailsButton: {
-    marginTop: 12,
-    backgroundColor: 'transparent',
-    shadowOpacity: 0,
-    elevation: 0,
+    marginTop: 16,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  sectionHeader: {
+  
+  // 🎭 Enhanced Empty States for Legacy Support
+  activityGroup: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  
+  // 💳 Modern Digital Wallet Styles
+  modernWalletContent: {
+    gap: 16,
+  },
+  modernAccountSummary: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  summaryHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  accountIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryInfo: {
+    flex: 1,
+  },
+  accountNameModern: {
+    fontSize: 18, // Between body and H3
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 2,
+  },
+  accountTypeModern: {
+    fontSize: 14, // Caption size
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  balanceSection: {
     alignItems: 'center',
     marginBottom: 16,
   },
-  viewAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'transparent',
-    borderRadius: 8,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  viewAllText: {
+  balanceLabelModern: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
+    color: '#6B7280',
+    fontWeight: '500',
+    marginBottom: 8,
   },
-  activityList: {
-    gap: 12,
+  balanceAmountModern: {
+    fontSize: 24, // H2 size
+    fontWeight: '800',
+    color: '#1E3A8A',
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
-  activityItem: {
+  balanceMetadata: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+    gap: 4,
   },
-  activityInfo: {
-    flex: 1,
+  balanceUpdatedModern: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
-  activityType: {
+  ibanContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  ibanLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  ibanValueModern: {
     fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 2,
+    color: '#1E3A8A',
+    fontWeight: '600',
+    fontFamily: 'monospace',
   },
-  activityRecipient: {
+  
+  // 🎯 Modern Empty States
+  modernEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 16,
+  },
+  accountSelectionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  accountSelectionCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 120,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  accountCardIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountCardName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E3A8A',
+    textAlign: 'center',
+  },
+  accountCardCurrency: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  createAccountButtonModern: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 8,
+  },
+  createAccountTextModern: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333333',
-    marginBottom: 2,
+    color: '#FFFFFF',
   },
-  activityDescription: {
-    fontSize: 13,
-    color: '#6c757d',
-    marginBottom: 4,
-    fontStyle: 'italic',
+
+  // 🏛️ Legacy Fallback Styles
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  activityDate: {
-    fontSize: 12,
-    color: '#6c757d',
-  },
-  activityAmount: {
-    alignItems: 'flex-end',
-  },
-  activityAmountText: {
-    fontSize: 16,
+  title: {
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  activityCurrency: {
-    fontSize: 12,
-    color: '#6c757d',
+    color: '#1E3A8A',
+    marginBottom: 8,
   },
 });

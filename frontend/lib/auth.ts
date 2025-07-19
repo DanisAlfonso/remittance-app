@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { AuthState, LoginCredentials, RegisterData, AuthResponse, ApiError } from '../types';
+import type { AuthState, LoginCredentials, RegisterData, AuthResponse, ApiError, User } from '../types';
 import { apiClient } from './api';
 
 const TOKEN_KEY = 'auth_token';
@@ -39,6 +39,7 @@ interface AuthActions {
   loadStoredAuth: () => Promise<void>;
   clearError: () => void;
   validateSession: () => Promise<boolean>;
+  updateUser: (userData: Partial<User>) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
@@ -199,6 +200,36 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       clearError: () => {
         set({ error: null });
+      },
+
+      updateUser: async (userData: Partial<User>) => {
+        set({ isLoading: true, error: null });
+        
+        try {
+          // TODO: Implement API call to update user profile
+          // const response = await apiClient.put('/auth/profile', userData);
+          
+          // Merge with current user data and update secure storage
+          const currentUser = get().user;
+          if (!currentUser) {
+            throw new Error('No user logged in');
+          }
+          const updatedUser = { ...currentUser, ...userData };
+          await SecureStore.setItemAsync(USER_KEY, JSON.stringify(updatedUser));
+          
+          set({
+            user: updatedUser,
+            isLoading: false,
+            error: null,
+          });
+        } catch (error) {
+          const apiError = error as ApiError;
+          set({
+            isLoading: false,
+            error: apiError.message || 'Update failed',
+          });
+          throw error;
+        }
       },
     }),
     {

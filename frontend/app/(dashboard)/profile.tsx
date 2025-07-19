@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/auth';
 import Button from '../../components/ui/Button';
+import ProfileCircle from '../../components/ui/ProfileCircle';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -47,8 +50,19 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>Profile</Text>
-          <Text style={styles.subtitle}>Manage your account information</Text>
+          <View style={styles.profileHeader}>
+            <ProfileCircle
+              firstName={user.firstName}
+              lastName={user.lastName}
+              email={user.email}
+              size={80}
+              backgroundColor="#007AFF"
+            />
+            <View style={styles.headerText}>
+              <Text style={styles.title}>Profile</Text>
+              <Text style={styles.subtitle}>Manage your account information</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -122,18 +136,26 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Account Settings</Text>
           
           <View style={styles.settingsGroup}>
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={() => router.push('/(dashboard)/edit-profile')}
+            >
               <View style={styles.settingInfo}>
                 <Text style={styles.settingTitle}>Edit Profile</Text>
                 <Text style={styles.settingDescription}>Update your personal information</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#6c757d" />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={() => router.push('/(dashboard)/change-password')}
+            >
               <View style={styles.settingInfo}>
                 <Text style={styles.settingTitle}>Change Password</Text>
                 <Text style={styles.settingDescription}>Update your account password</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#6c757d" />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.settingItem}>
@@ -141,6 +163,7 @@ export default function ProfileScreen() {
                 <Text style={styles.settingTitle}>Email Preferences</Text>
                 <Text style={styles.settingDescription}>Manage notification settings</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#6c757d" />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.settingItem}>
@@ -148,6 +171,7 @@ export default function ProfileScreen() {
                 <Text style={styles.settingTitle}>Privacy Settings</Text>
                 <Text style={styles.settingDescription}>Control your data and privacy</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#6c757d" />
             </TouchableOpacity>
           </View>
         </View>
@@ -161,6 +185,7 @@ export default function ProfileScreen() {
                 <Text style={styles.settingTitle}>Two-Factor Authentication</Text>
                 <Text style={styles.settingDescription}>Add an extra layer of security</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#6c757d" />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.settingItem}>
@@ -168,6 +193,7 @@ export default function ProfileScreen() {
                 <Text style={styles.settingTitle}>Login History</Text>
                 <Text style={styles.settingDescription}>View your recent login activity</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#6c757d" />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.settingItem}>
@@ -175,6 +201,7 @@ export default function ProfileScreen() {
                 <Text style={styles.settingTitle}>Trusted Devices</Text>
                 <Text style={styles.settingDescription}>Manage your trusted devices</Text>
               </View>
+              <Ionicons name="chevron-forward" size={20} color="#6c757d" />
             </TouchableOpacity>
           </View>
         </View>
@@ -207,6 +234,14 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 32,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
     fontSize: 28,
@@ -281,6 +316,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 8,
     borderBottomWidth: 1,

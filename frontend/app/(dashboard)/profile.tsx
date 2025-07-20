@@ -1,13 +1,33 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/auth';
+import { apiClient } from '../../lib/api';
 import ProfileCircle from '../../components/ui/ProfileCircle';
+import { 
+  checkBiometricCapabilities, 
+  isBiometricEnabled, 
+  setBiometricEnabled, 
+  getBiometricTypeName,
+  getBiometricCredentials,
+  storeBiometricCredentials,
+  authenticateWithBiometrics,
+  validateBiometricUser
+} from '../../lib/biometric';
+import type { BiometricCapabilities } from '../../lib/biometric';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
+  const [biometricCapabilities, setBiometricCapabilities] = useState<BiometricCapabilities | null>(null);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [switchValue, setSwitchValue] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordPromiseResolve, setPasswordPromiseResolve] = useState<((value: string | null) => void) | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const formatDate = (dateString: string | Date) => {
     if (!dateString) {
@@ -28,6 +48,204 @@ export default function ProfileScreen() {
     } catch {
       return 'N/A';
     }
+  };
+
+  // Check biometric capabilities and current status
+  useEffect(() => {
+    const initBiometrics = async () => {
+      // Validate biometric data belongs to current user
+      if (user?.email) {
+        await validateBiometricUser(user.email);
+      }
+      
+      const capabilities = await checkBiometricCapabilities();
+      setBiometricCapabilities(capabilities);
+      
+      if (capabilities.canUseBiometrics) {
+        const enabled = await isBiometricEnabled();
+        setBiometricEnabledState(enabled);
+        setSwitchValue(enabled);
+      } else {
+        setBiometricEnabledState(false);
+        setSwitchValue(false);
+      }
+    };
+    
+    initBiometrics();
+  }, [user?.email]);
+
+  const showPasswordPrompt = (biometricType: string) => {
+    return new Promise<string | null>((resolve) => {
+      setPasswordInput('');
+      setPasswordPromiseResolve(() => resolve);
+      setPasswordModalVisible(true);
+    });
+  };
+
+  const handlePasswordCancel = () => {
+    setPasswordModalVisible(false);
+    setPasswordInput('');
+    setShowPassword(false);
+    if (passwordPromiseResolve) {
+      passwordPromiseResolve(null);
+      setPasswordPromiseResolve(null);
+    }
+  };
+
+  const handlePasswordConfirm = () => {
+    setPasswordModalVisible(false);
+    const password = passwordInput.trim();
+    setPasswordInput('');
+    setShowPassword(false);
+    if (passwordPromiseResolve) {
+      passwordPromiseResolve(password || null);
+      setPasswordPromiseResolve(null);
+    }
+  };
+
+  const verifyPasswordWithAPI = async (password: string): Promise<boolean> => {
+    try {
+      if (!user?.email) {
+        return false;
+      }
+      
+      // Attempt to login with current email and provided password
+      const response = await apiClient.post('/auth/login', {
+        email: user.email,
+        password: password,
+      });
+      
+      // Check if response has token and user (successful login)
+      return !!(response?.token && response?.user);
+    } catch (error) {
+      console.error('Password verification failed:', error);
+      return false;
+    }
+  };
+
+  const handleBiometricToggle = async (newValue: boolean) => {
+    if (biometricLoading) {
+      return;
+    }
+    
+    if (newValue) {
+      // Update switch immediately for responsive UI when enabling
+      setSwitchValue(newValue);
+      await enableBiometric();
+    } else {
+      // For disabling, show confirmation dialog immediately
+      // Don't change switch state until user confirms
+      await disableBiometric();
+    }
+  };
+
+  const enableBiometric = async () => {
+    if (!biometricCapabilities?.canUseBiometrics) {
+      setSwitchValue(false);
+      Alert.alert('Biometric Not Available', 'Biometric authentication is not available on this device.');
+      return;
+    }
+
+    setBiometricLoading(true);
+    
+    try {
+      const biometricType = getBiometricTypeName(biometricCapabilities.supportedTypes);
+      
+      // Check if we already have stored credentials
+      const existingCredentials = await getBiometricCredentials();
+      
+      if (!existingCredentials) {
+        // Need to prompt for password and store credentials
+        const password = await showPasswordPrompt(biometricType);
+        
+        if (!password) {
+          // User cancelled - revert switch
+          setSwitchValue(false);
+          setBiometricLoading(false);
+          return;
+        }
+        
+        // Verify the password with the server
+        const isValidPassword = await verifyPasswordWithAPI(password);
+        
+        if (!isValidPassword) {
+          // Invalid password - revert switch
+          setSwitchValue(false);
+          setBiometricLoading(false);
+          Alert.alert('Invalid Password', 'The password you entered is incorrect. Please try again.');
+          return;
+        }
+        
+        // Store the credentials securely
+        if (user?.email) {
+          await storeBiometricCredentials(user.email, password);
+        }
+      }
+      
+      // Perform biometric authentication to confirm the user can use it
+      const authResult = await authenticateWithBiometrics(
+        `Use ${biometricType} to enable authentication`
+      );
+      
+      if (authResult.success) {
+        // Success - enable biometric
+        await setBiometricEnabled(true);
+        setBiometricEnabledState(true);
+        setSwitchValue(true);
+        setBiometricLoading(false);
+        
+        Alert.alert('Success', `${biometricType} authentication has been enabled successfully.`);
+      } else {
+        // Failed or cancelled - revert switch
+        setSwitchValue(false);
+        setBiometricLoading(false);
+        
+        if (!authResult.cancelled) {
+          Alert.alert('Authentication Failed', authResult.error || 'Please try again.');
+        }
+      }
+    } catch (error) {
+      // Error - revert switch
+      console.error('Error enabling biometric:', error);
+      setSwitchValue(false);
+      setBiometricLoading(false);
+      Alert.alert('Error', 'An error occurred while enabling biometric authentication.');
+    }
+  };
+
+  const disableBiometric = async () => {
+    Alert.alert(
+      'Disable Biometric Authentication?',
+      'You will need to use your password to sign in.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          // Switch should stay in its current position
+        },
+        {
+          text: 'Disable',
+          style: 'destructive',
+          onPress: async () => {
+            setBiometricLoading(true);
+            try {
+              await setBiometricEnabled(false);
+              setBiometricEnabledState(false);
+              setSwitchValue(false);
+              setBiometricLoading(false);
+              
+              Alert.alert('Disabled', 'Biometric authentication has been disabled.');
+            } catch (error) {
+              console.error('Error disabling biometric:', error);
+              setBiometricLoading(false);
+              Alert.alert('Error', 'Failed to disable biometric authentication.');
+              // Revert switch to previous state
+              setSwitchValue(true);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLogout = async () => {
@@ -195,6 +413,38 @@ export default function ProfileScreen() {
           </View>
           
           <View style={styles.modernSettingsGroup}>
+            {/* Biometric Authentication Setting */}
+            {biometricCapabilities?.canUseBiometrics && (
+              <View style={styles.modernSettingItem}>
+                <View style={styles.settingIconContainer}>
+                  <Ionicons 
+                    name="shield-checkmark" 
+                    size={20} 
+                    color={switchValue ? "#10B981" : "#9CA3AF"} 
+                  />
+                </View>
+                <View style={styles.modernSettingInfo}>
+                  <Text style={styles.modernSettingTitle}>
+                    {getBiometricTypeName(biometricCapabilities.supportedTypes)}
+                  </Text>
+                  <Text style={styles.modernSettingDescription}>
+                    {switchValue 
+                      ? 'Quick and secure sign in enabled' 
+                      : 'Enable for faster sign in'
+                    }
+                  </Text>
+                </View>
+                <Switch
+                  value={switchValue}
+                  onValueChange={handleBiometricToggle}
+                  disabled={biometricLoading}
+                  trackColor={{ false: '#E5E7EB', true: '#10B981' }}
+                  thumbColor={switchValue ? '#FFFFFF' : '#FFFFFF'}
+                  ios_backgroundColor="#E5E7EB"
+                />
+              </View>
+            )}
+            
             <TouchableOpacity style={styles.modernSettingItem}>
               <View style={styles.settingIconContainer}>
                 <Ionicons name="finger-print-outline" size={20} color="#F59E0B" />
@@ -245,6 +495,69 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Password Input Modal */}
+      <Modal
+        visible={passwordModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handlePasswordCancel}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="lock-closed" size={24} color="#3B82F6" />
+              <Text style={styles.modalTitle}>Enter Your Password</Text>
+            </View>
+            
+            <Text style={styles.modalMessage}>
+              Please enter your current password to enable biometric authentication.
+            </Text>
+            
+            <View style={styles.modalInputContainer}>
+              <View style={styles.passwordInputWrapper}>
+                <TextInput
+                  style={styles.modalInput}
+                  value={passwordInput}
+                  onChangeText={setPasswordInput}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry={!showPassword}
+                  autoFocus
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggleButton}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={handlePasswordCancel}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={handlePasswordConfirm}
+              >
+                <Text style={styles.modalConfirmButtonText}>Enable</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -508,5 +821,108 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
     marginTop: 8,
+  },
+
+  // 🔐 Password Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    letterSpacing: -0.3,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  modalInputContainer: {
+    marginBottom: 24,
+  },
+  passwordInputWrapper: {
+    position: 'relative',
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingRight: 50,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1E3A8A',
+  },
+  passwordToggleButton: {
+    position: 'absolute',
+    right: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 24,
+    height: '100%',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelButton: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  modalConfirmButton: {
+    backgroundColor: '#3B82F6',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalConfirmButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

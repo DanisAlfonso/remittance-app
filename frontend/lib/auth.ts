@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { AuthState, LoginCredentials, RegisterData, AuthResponse, ApiError, User } from '../types';
 import { apiClient } from './api';
+import { validateBiometricUser } from './biometric';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
@@ -69,6 +70,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             }
           }
           
+          // Validate biometric data belongs to current user (clear if different user)
+          await validateBiometricUser(response.user.email);
+          
           await SecureStore.setItemAsync(TOKEN_KEY, response.token);
           await SecureStore.setItemAsync(USER_KEY, JSON.stringify(response.user));
 
@@ -124,6 +128,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           await SecureStore.deleteItemAsync(USER_KEY);
           // Clear wallet data on logout
           await SecureStore.deleteItemAsync('wallet-storage');
+          // NOTE: We do NOT clear biometric data on logout
+          // Biometric settings should persist per user across sessions
         } catch (error) {
           console.error('Error clearing stored auth:', error);
         }

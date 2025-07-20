@@ -6,6 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../lib/auth';
 import { validateEmail, validatePassword, validateName, validatePhone, sanitizeInput } from '../../utils/validation';
+import { 
+  checkBiometricCapabilities, 
+  setBiometricEnabled, 
+  getBiometricTypeName,
+  storeBiometricCredentials 
+} from '../../lib/biometric';
 import { TextInput } from 'react-native';
 import Button from '../../components/ui/Button';
 import type { RegisterData, ValidationError, ApiError } from '../../types';
@@ -118,6 +124,42 @@ export default function RegisterScreen() {
     setCurrentStep(step);
   };
 
+  const offerBiometricSetup = async () => {
+    try {
+      const capabilities = await checkBiometricCapabilities();
+      
+      if (capabilities.canUseBiometrics) {
+        const biometricType = getBiometricTypeName(capabilities.supportedTypes);
+        const email = stepData.step2.email;
+        const password = stepData.step3.password;
+        
+        Alert.alert(
+          'Enable Biometric Sign In?',
+          `Would you like to enable ${biometricType} for faster sign in to your RemitPay account?`,
+          [
+            {
+              text: 'Not Now',
+              style: 'cancel',
+            },
+            {
+              text: `Enable ${biometricType}`,
+              onPress: async () => {
+                try {
+                  await setBiometricEnabled(true);
+                  await storeBiometricCredentials(email, password);
+                } catch (error) {
+                  console.error('Error enabling biometric:', error);
+                }
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error offering biometric setup:', error);
+    }
+  };
+
   const handleRegister = async () => {
     if (!validateCurrentStep()) {
       return;
@@ -135,6 +177,9 @@ export default function RegisterScreen() {
       };
 
       await register(sanitizedData);
+      
+      // Offer biometric setup after successful registration
+      await offerBiometricSetup();
       
       // Navigation is handled by the auth state change
       router.replace('/(dashboard)');

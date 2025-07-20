@@ -1,19 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '../../lib/auth';
 import { validateEmail, sanitizeInput } from '../../utils/validation';
+import { 
+  checkBiometricCapabilities, 
+  authenticateWithBiometrics, 
+  isBiometricEnabled, 
+  getBiometricTypeName, 
+  getBiometricIconName,
+  storeBiometricCredentials,
+  getBiometricCredentials
+} from '../../lib/biometric';
 import { TextInput } from 'react-native';
 import Button from '../../components/ui/Button';
 import type { ValidationError, ApiError } from '../../types';
+import type { BiometricCapabilities } from '../../lib/biometric';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [biometricCapabilities, setBiometricCapabilities] = useState<BiometricCapabilities | null>(null);
+  const [showBiometricOption, setShowBiometricOption] = useState(false);
   
   const updateEmail = (value: string) => {
     setEmail(value);
@@ -30,6 +42,37 @@ export default function LoginScreen() {
   };
   
   const { login, isLoading, error, clearError } = useAuthStore();
+
+  // Check biometric capabilities on component mount AND when component becomes visible
+  useEffect(() => {
+    const initBiometrics = async () => {
+      const capabilities = await checkBiometricCapabilities();
+      setBiometricCapabilities(capabilities);
+      
+      if (capabilities.canUseBiometrics) {
+        const enabled = await isBiometricEnabled();
+        setShowBiometricOption(enabled);
+      } else {
+        setShowBiometricOption(false);
+      }
+    };
+    
+    initBiometrics();
+  }, []);
+
+  // Check biometric status when screen comes into focus (user returns from profile)
+  useFocusEffect(
+    React.useCallback(() => {
+      const recheckBiometrics = async () => {
+        if (biometricCapabilities?.canUseBiometrics) {
+          const enabled = await isBiometricEnabled();
+          setShowBiometricOption(enabled);
+        }
+      };
+      
+      recheckBiometrics();
+    }, [biometricCapabilities])
+  );
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -57,10 +100,15 @@ export default function LoginScreen() {
     clearError();
     
     try {
-      await login({
+      const credentials = {
         email: sanitizeInput(email.trim()),
         password: password,
-      });
+      };
+      
+      await login(credentials);
+      
+      // Store credentials for biometric authentication if enabled
+      await handleBiometricCredentialStorage(credentials.email, credentials.password);
       
       // Navigation is handled by the auth state change
       router.replace('/(dashboard)');
@@ -77,6 +125,65 @@ export default function LoginScreen() {
       } else {
         Alert.alert('Login Failed', apiError.message || 'An error occurred');
       }
+    }
+  };
+
+  const handleBiometricCredentialStorage = async (email: string, password: string) => {
+    try {
+      if (biometricCapabilities?.canUseBiometrics) {
+        const enabled = await isBiometricEnabled();
+        if (enabled) {
+          await storeBiometricCredentials(email, password);
+        }
+      }
+    } catch (error) {
+      console.error('Error storing biometric credentials:', error);
+      // Don't show error to user, just log it
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    if (!biometricCapabilities?.canUseBiometrics) {
+      Alert.alert('Biometric Not Available', 'Biometric authentication is not available on this device.');
+      return;
+    }
+
+    clearError();
+
+    try {
+      // First perform biometric authentication
+      const authResult = await authenticateWithBiometrics(
+        `Use ${getBiometricTypeName(biometricCapabilities.supportedTypes)} to sign in to RemitPay`
+      );
+
+      if (authResult.success) {
+        // Get stored credentials
+        const credentials = await getBiometricCredentials();
+        
+        if (credentials) {
+          // Use stored credentials to login
+          await login({
+            email: credentials.email,
+            password: credentials.password,
+          });
+          
+          // Navigation is handled by the auth state change
+          router.replace('/(dashboard)');
+        } else {
+          Alert.alert(
+            'Credentials Not Found', 
+            'No stored credentials found. Please sign in with your email and password first.'
+          );
+        }
+      } else if (!authResult.cancelled) {
+        Alert.alert(
+          'Authentication Failed', 
+          authResult.error || 'Biometric authentication failed. Please try again.'
+        );
+      }
+    } catch (error) {
+      console.error('Biometric login error:', error);
+      Alert.alert('Error', 'An error occurred during biometric authentication.');
     }
   };
 
@@ -181,6 +288,34 @@ export default function LoginScreen() {
                 style={styles.modernSignInButton}
                 textStyle={styles.modernSignInButtonText}
               />
+
+              {/* Biometric Authentication Option */}
+              {showBiometricOption && biometricCapabilities && (
+                <>
+                  <View style={styles.biometricDivider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.biometricDividerText}>or</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.biometricButton}
+                    onPress={handleBiometricLogin}
+                  >
+                    <View style={styles.biometricIconContainer}>
+                      <Ionicons 
+                        name={getBiometricIconName(biometricCapabilities.supportedTypes)} 
+                        size={24} 
+                        color="#3B82F6" 
+                      />
+                    </View>
+                    <Text style={styles.biometricButtonText}>
+                      Sign in with {getBiometricTypeName(biometricCapabilities.supportedTypes)}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
+                  </TouchableOpacity>
+                </>
+              )}
 
               {error && (
                 <View style={styles.modernErrorContainer}>
@@ -432,6 +567,49 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 14,
     fontWeight: '500',
+    flex: 1,
+  },
+
+  // 🔐 Biometric Authentication
+  biometricDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    gap: 12,
+  },
+  biometricDividerText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  biometricButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  biometricIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  biometricButtonText: {
+    fontSize: 16,
+    color: '#1E3A8A',
+    fontWeight: '600',
     flex: 1,
   },
 

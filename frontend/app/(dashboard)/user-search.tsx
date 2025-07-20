@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/auth';
 import { apiClient } from '../../lib/api';
 import type { SearchResult, UserSearchResponse } from '../../types/users';
@@ -122,365 +122,511 @@ export default function UserSearchScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Header with back button */}
-        <View style={styles.navigationHeader}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-          >
-            <Feather name="arrow-left" size={20} color="#374151" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Find App User</Text>
-        </View>
-        
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Modern Header */}
+      <View style={styles.modernHeader}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Send {currency || 'EUR'}</Text>
-            <Text style={styles.subtitle}>Search for another app user to send money to</Text>
-          </View>
+          <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Find App User</Text>
+          <Text style={styles.headerSubtitle}>Send {currency || 'EUR'}</Text>
+        </View>
+        <View style={styles.headerAction} />
+      </View>
+      
+      <ScrollView 
+        style={styles.modernScrollView}
+        contentContainerStyle={styles.modernScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
 
-          {/* Search Input */}
-          <View style={styles.searchSection}>
-            <View style={styles.searchInputContainer}>
-              <Feather name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder={getSearchPlaceholder()}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus={true}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity
-                  style={styles.clearButton}
-                  onPress={() => {
-                    setSearchQuery('');
-                    setSearchResults([]);
-                    setHasSearched(false);
-                  }}
-                >
-                  <Feather name="x" size={18} color="#9ca3af" />
-                </TouchableOpacity>
-              )}
+        {/* Modern Search Section */}
+        <View style={styles.modernSearchSection}>
+          <Text style={styles.searchSectionTitle}>Search for App User</Text>
+          <Text style={styles.searchSectionSubtitle}>Find another user to send money to</Text>
+          
+          <View style={styles.modernSearchContainer}>
+            <View style={styles.searchIconContainer}>
+              <Ionicons name="search" size={20} color="#6B7280" />
             </View>
-            
+            <TextInput
+              style={styles.modernSearchInput}
+              placeholder={getSearchPlaceholder()}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus={true}
+              placeholderTextColor="#9CA3AF"
+            />
             {searchQuery.length > 0 && (
-              <Text style={styles.searchHelp}>
-                {getSearchHelpText()}
-              </Text>
+              <TouchableOpacity
+                style={styles.modernClearButton}
+                onPress={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                  setHasSearched(false);
+                }}
+              >
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
             )}
           </View>
-
-          {/* Search Results */}
-          {isSearching && (
-            <View style={styles.loadingSection}>
-              <Text style={styles.loadingText}>Searching...</Text>
+          
+          {searchQuery.length > 0 && (
+            <View style={styles.searchStatusContainer}>
+              <Ionicons name="information-circle" size={16} color="#3B82F6" />
+              <Text style={styles.modernSearchHelp}>
+                {getSearchHelpText()}
+              </Text>
             </View>
           )}
+        </View>
 
-          {hasSearched && !isSearching && (
-            <View style={styles.resultsSection}>
-              <Text style={styles.sectionTitle}>
+        {/* Modern Search Results */}
+        {isSearching && (
+          <View style={styles.modernLoadingSection}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#3B82F6" />
+              <Text style={styles.modernLoadingText}>Searching users...</Text>
+            </View>
+          </View>
+        )}
+
+        {hasSearched && !isSearching && (
+          <View style={styles.modernResultsSection}>
+            <View style={styles.resultsHeader}>
+              <Text style={styles.modernSectionTitle}>
                 {searchResults.length > 0 
-                  ? `${searchResults.length} user${searchResults.length > 1 ? 's' : ''} found`
-                  : 'No users found'
+                  ? `Found ${searchResults.length} user${searchResults.length > 1 ? 's' : ''}`
+                  : 'No Users Found'
                 }
               </Text>
+              {searchResults.length > 0 && (
+                <View style={styles.resultsCount}>
+                  <Ionicons name="people" size={16} color="#6B7280" />
+                  <Text style={styles.resultsCountText}>{searchResults.length}</Text>
+                </View>
+              )}
+            </View>
               
-              {searchResults.length > 0 ? (
-                <View style={styles.resultsList}>
-                  {searchResults.map((user) => (
-                    <TouchableOpacity
-                      key={user.id}
-                      style={styles.userCard}
-                      onPress={() => handleSelectUser(user)}
-                    >
-                      <View style={styles.userAvatar}>
-                        <Text style={styles.userInitials}>
-                          {user.firstName[0]}{user.lastName[0]}
-                        </Text>
-                      </View>
-                      <View style={styles.userInfo}>
-                        <Text style={styles.userName}>{user.displayName}</Text>
-                        {user.username && (
-                          <Text style={styles.userUsername}>@{user.username}</Text>
-                        )}
-                        <Text style={styles.userMemberSince}>
+            {searchResults.length > 0 ? (
+              <View style={styles.modernResultsList}>
+                {searchResults.map((user) => (
+                  <TouchableOpacity
+                    key={user.id}
+                    style={styles.modernUserCard}
+                    onPress={() => handleSelectUser(user)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.modernUserAvatar}>
+                      <Text style={styles.modernUserInitials}>
+                        {user.firstName[0]}{user.lastName[0]}
+                      </Text>
+                    </View>
+                    <View style={styles.modernUserInfo}>
+                      <Text style={styles.modernUserName}>{user.displayName}</Text>
+                      {user.username && (
+                        <View style={styles.usernameContainer}>
+                          <Ionicons name="at" size={12} color="#3B82F6" />
+                          <Text style={styles.modernUserUsername}>{user.username}</Text>
+                        </View>
+                      )}
+                      <View style={styles.memberSinceContainer}>
+                        <Ionicons name="time-outline" size={12} color="#9CA3AF" />
+                        <Text style={styles.modernUserMemberSince}>
                           Member since {formatMemberSince(user.memberSince)}
                         </Text>
                       </View>
-                      <Feather name="arrow-right" size={20} color="#9ca3af" />
-                    </TouchableOpacity>
-                  ))}
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.modernEmptyState}>
+                <View style={styles.emptyIconContainer}>
+                  <Ionicons name="person-remove" size={48} color="#D1D5DB" />
                 </View>
-              ) : (
-                <View style={styles.emptyState}>
-                  <Feather name="user-x" size={48} color="#9ca3af" style={styles.emptyIcon} />
-                  <Text style={styles.emptyTitle}>No users found</Text>
-                  <Text style={styles.emptyText}>
-                    Try searching with a different username, email, or phone number
-                  </Text>
-                </View>
-              )}
+                <Text style={styles.modernEmptyTitle}>No Users Found</Text>
+                <Text style={styles.modernEmptyText}>
+                  Try searching with a different username, email, or phone number
+                </Text>
+              </View>
+            )}
             </View>
           )}
 
-          {/* Search Tips */}
-          {!hasSearched && searchQuery.length === 0 && (
-            <View style={styles.tipsSection}>
-              <Text style={styles.sectionTitle}>Search tips</Text>
-              <View style={styles.tipsList}>
-                <View style={styles.tipItem}>
-                  <Feather name="at-sign" size={16} color="#6366f1" style={styles.tipIcon} />
-                  <Text style={styles.tipText}>Use @username for exact username search</Text>
+        {/* Modern Search Tips */}
+        {!hasSearched && searchQuery.length === 0 && (
+          <View style={styles.modernTipsSection}>
+            <Text style={styles.modernSectionTitle}>Search Tips</Text>
+            <Text style={styles.tipsSubtitle}>Here&apos;s how you can find users</Text>
+            
+            <View style={styles.modernTipsList}>
+              <View style={styles.modernTipItem}>
+                <View style={styles.tipIconContainer}>
+                  <Ionicons name="at" size={20} color="#3B82F6" />
                 </View>
-                <View style={styles.tipItem}>
-                  <Feather name="mail" size={16} color="#6366f1" style={styles.tipIcon} />
-                  <Text style={styles.tipText}>Enter email address for email search</Text>
+                <View style={styles.tipContent}>
+                  <Text style={styles.modernTipTitle}>Username Search</Text>
+                  <Text style={styles.modernTipText}>Use @username for exact username search</Text>
                 </View>
-                <View style={styles.tipItem}>
-                  <Feather name="phone" size={16} color="#6366f1" style={styles.tipIcon} />
-                  <Text style={styles.tipText}>Use phone number for phone search</Text>
+              </View>
+              
+              <View style={styles.modernTipItem}>
+                <View style={styles.tipIconContainer}>
+                  <Ionicons name="mail" size={20} color="#10B981" />
                 </View>
-                <View style={styles.tipItem}>
-                  <Feather name="user" size={16} color="#6366f1" style={styles.tipIcon} />
-                  <Text style={styles.tipText}>Search by first or last name</Text>
+                <View style={styles.tipContent}>
+                  <Text style={styles.modernTipTitle}>Email Search</Text>
+                  <Text style={styles.modernTipText}>Enter full email address to find users</Text>
+                </View>
+              </View>
+              
+              <View style={styles.modernTipItem}>
+                <View style={styles.tipIconContainer}>
+                  <Ionicons name="call" size={20} color="#F59E0B" />
+                </View>
+                <View style={styles.tipContent}>
+                  <Text style={styles.modernTipTitle}>Phone Search</Text>
+                  <Text style={styles.modernTipText}>Use phone number with country code</Text>
+                </View>
+              </View>
+              
+              <View style={styles.modernTipItem}>
+                <View style={styles.tipIconContainer}>
+                  <Ionicons name="person" size={20} color="#8B5CF6" />
+                </View>
+                <View style={styles.tipContent}>
+                  <Text style={styles.modernTipTitle}>Name Search</Text>
+                  <Text style={styles.modernTipText}>Search by first or last name</Text>
                 </View>
               </View>
             </View>
-          )}
-        </ScrollView>
-      </View>
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  // 🎨 Base Layout
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8fafb',
+    backgroundColor: '#F8FAFC',
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafb',
-  },
-  navigationHeader: {
+
+  // 🌟 Modern Header
+  modernHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#f8fafb',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1d29',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1a1d29',
-    marginBottom: 8,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#64748b',
-    lineHeight: 24,
-  },
-  searchSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1e293b',
-    fontWeight: '500',
-  },
-  clearButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
-  searchHelp: {
-    fontSize: 14,
-    color: '#6366f1',
-    marginTop: 8,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  loadingSection: {
-    paddingHorizontal: 20,
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
-    paddingVertical: 32,
+    justifyContent: 'center',
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#64748b',
-    fontWeight: '500',
+  headerContent: {
+    flex: 1,
+    alignItems: 'center',
   },
-  resultsSection: {
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
-    paddingHorizontal: 4,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E3A8A',
     letterSpacing: -0.3,
   },
-  resultsList: {
-    gap: 12,
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  userCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+  headerAction: {
+    width: 44,
+    height: 44,
+  },
+
+  // 📱 Modern Scroll
+  modernScrollView: {
+    flex: 1,
+  },
+  modernScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 32,
+  },
+  // 🔍 Modern Search Section
+  modernSearchSection: {
     padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  searchSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 4,
+    letterSpacing: -0.3,
+  },
+  searchSectionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginBottom: 20,
+  },
+  modernSearchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    gap: 12,
+  },
+  searchIconContainer: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1E3A8A',
+    fontWeight: '500',
+  },
+  modernClearButton: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  modernSearchHelp: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '500',
+    flex: 1,
+  },
+  // 🔄 Modern Loading Section
+  modernLoadingSection: {
+    padding: 24,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#f8fafc',
+    borderColor: '#F1F5F9',
+    gap: 12,
   },
-  userAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#e0e7ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  userInitials: {
+  modernLoadingText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#3730a3',
+    color: '#6B7280',
+    fontWeight: '500',
   },
-  userInfo: {
+
+  // 📊 Modern Results Section
+  modernResultsSection: {
+    padding: 16,
+  },
+  resultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  modernSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    letterSpacing: -0.3,
+  },
+  resultsCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  resultsCountText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '600',
+  },
+
+  // 👤 Modern User Cards
+  modernResultsList: {
+    gap: 12,
+  },
+  modernUserCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    gap: 16,
+  },
+  modernUserAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernUserInitials: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#3B82F6',
+  },
+  modernUserInfo: {
     flex: 1,
   },
-  userName: {
+  modernUserName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 6,
   },
-  userUsername: {
-    fontSize: 14,
-    color: '#6366f1',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  userMemberSince: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  emptyState: {
+  usernameContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
+    marginBottom: 4,
+    gap: 4,
   },
-  emptyIcon: {
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
+  modernUserUsername: {
+    fontSize: 14,
+    color: '#3B82F6',
     fontWeight: '600',
-    color: '#374151',
+  },
+  memberSinceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  modernUserMemberSince: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  // 🎭 Modern Empty State
+  modernEmptyState: {
+    alignItems: 'center',
+    padding: 32,
+    gap: 16,
+  },
+  emptyIconContainer: {
+    padding: 20,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#F1F5F9',
     marginBottom: 8,
   },
-  emptyText: {
+  modernEmptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  modernEmptyText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 20,
   },
-  tipsSection: {
-    paddingHorizontal: 20,
-    marginTop: 32,
+
+  // 💡 Modern Tips Section
+  modernTipsSection: {
+    padding: 16,
   },
-  tipsList: {
+  tipsSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginBottom: 20,
+  },
+  modernTipsList: {
     gap: 16,
   },
-  tipItem: {
+  modernTipItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 2,
+    alignItems: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#f8fafc',
+    borderColor: '#F1F5F9',
+    gap: 16,
   },
-  tipIcon: {
-    marginRight: 12,
+  tipIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tipText: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
+  tipContent: {
     flex: 1,
+  },
+  modernTipTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 4,
+  },
+  modernTipText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    lineHeight: 18,
   },
 });

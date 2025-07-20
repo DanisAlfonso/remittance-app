@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/ui/Button';
 import SimpleInput from '../../components/ui/SimpleInput';
 
@@ -204,34 +205,47 @@ export default function AddRecipientScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Modern Header */}
+      <View style={styles.modernHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
         >
-          {/* Hero Section */}
-          <View style={styles.heroSection}>
-            <View style={styles.heroIcon}>
-              <Text style={styles.heroEmoji}>🏦</Text>
-            </View>
-            <Text style={styles.heroTitle}>Add Bank Recipient</Text>
-            <Text style={styles.heroSubtitle}>
-              Send {currency} to any European bank account
-            </Text>
-          </View>
+          <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Add Bank Recipient</Text>
+          <Text style={styles.headerSubtitle}>Send {currency} to Europe</Text>
+        </View>
+        <View style={styles.headerAction} />
+      </View>
+      
+      <ScrollView 
+        style={styles.modernScrollView}
+        contentContainerStyle={styles.modernScrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
 
-          {/* Main Form Card */}
-          <View style={styles.mainCard}>
+        {/* Modern Form Section */}
+        <View style={styles.modernFormSection}>
+          <View style={styles.formHeader}>
+            <View style={styles.formIconContainer}>
+              <Ionicons name="business" size={24} color="#3B82F6" />
+            </View>
+            <Text style={styles.formTitle}>Bank Account Details</Text>
+            <Text style={styles.formSubtitle}>Enter recipient information for secure transfer</Text>
+          </View>
+          
+          <View style={styles.modernFormCard}>
             {/* Account Holder Name */}
-            <View style={styles.fieldGroup}>
-              <View style={styles.fieldHeader}>
-                <View style={styles.fieldIcon}>
-                  <Text style={styles.fieldEmoji}>👤</Text>
+            <View style={styles.modernFieldGroup}>
+              <View style={styles.modernFieldHeader}>
+                <View style={styles.modernFieldIcon}>
+                  <Ionicons name="person" size={20} color="#6B7280" />
                 </View>
-                <Text style={styles.fieldLabel}>Account Holder</Text>
+                <Text style={styles.modernFieldLabel}>Account Holder Name</Text>
               </View>
               <SimpleInput
                 placeholder="Full name as it appears on the account"
@@ -239,16 +253,18 @@ export default function AddRecipientScreen() {
                 onChangeText={(value) => handleInputChange('holderName', value)}
                 error={errors.holderName}
                 autoCapitalize="words"
+                style={styles.modernInput}
               />
+              <Text style={styles.fieldHelpText}>Enter the exact name on the bank account</Text>
             </View>
 
             {/* IBAN */}
-            <View style={styles.fieldGroup}>
-              <View style={styles.fieldHeader}>
-                <View style={styles.fieldIcon}>
-                  <Text style={styles.fieldEmoji}>🔢</Text>
+            <View style={styles.modernFieldGroup}>
+              <View style={styles.modernFieldHeader}>
+                <View style={styles.modernFieldIcon}>
+                  <Ionicons name="card" size={20} color="#6B7280" />
                 </View>
-                <Text style={styles.fieldLabel}>IBAN</Text>
+                <Text style={styles.modernFieldLabel}>IBAN</Text>
                 <Text style={styles.fieldHint}>Any European bank</Text>
               </View>
               <SimpleInput
@@ -258,305 +274,341 @@ export default function AddRecipientScreen() {
                 error={errors.iban}
                 autoCapitalize="characters"
                 maxLength={42}
+                style={styles.modernInput}
               />
+              <Text style={styles.fieldHelpText}>Enter your European IBAN for secure transfer</Text>
               
               {/* Auto-detected Bank */}
               {detectedBank && (
-                <View style={styles.bankDetection}>
-                  <View style={styles.bankIcon}>
-                    <Text style={styles.bankEmoji}>✓</Text>
+                <View style={styles.modernBankDetection}>
+                  <View style={styles.modernBankIcon}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                   </View>
-                  <Text style={styles.bankName}>{detectedBank}</Text>
+                  <Text style={styles.modernBankName}>{detectedBank}</Text>
+                  <Text style={styles.bankVerifiedText}>Verified</Text>
                 </View>
               )}
             </View>
 
             {/* Security Notice */}
-            <View style={styles.securityCard}>
-              <View style={styles.securityHeader}>
-                <View style={styles.securityIcon}>
-                  <Text style={styles.securityEmoji}>🔒</Text>
+            <View style={styles.modernSecurityCard}>
+              <View style={styles.modernSecurityHeader}>
+                <View style={styles.modernSecurityIcon}>
+                  <Ionicons name="shield-checkmark" size={24} color="#10B981" />
                 </View>
-                <Text style={styles.securityTitle}>Secure Transfer</Text>
+                <Text style={styles.modernSecurityTitle}>Secure Transfer</Text>
               </View>
-              <View style={styles.securityFeatures}>
-                <View style={styles.securityFeature}>
-                  <Text style={styles.checkIcon}>✓</Text>
-                  <Text style={styles.securityText}>Bank-grade encryption</Text>
+              <View style={styles.modernSecurityFeatures}>
+                <View style={styles.modernSecurityFeature}>
+                  <Ionicons name="checkmark" size={16} color="#10B981" />
+                  <Text style={styles.modernSecurityText}>Bank-grade encryption</Text>
                 </View>
-                <View style={styles.securityFeature}>
-                  <Text style={styles.checkIcon}>✓</Text>
-                  <Text style={styles.securityText}>1-2 business day delivery</Text>
+                <View style={styles.modernSecurityFeature}>
+                  <Ionicons name="checkmark" size={16} color="#10B981" />
+                  <Text style={styles.modernSecurityText}>1-2 business day delivery</Text>
                 </View>
-                <View style={styles.securityFeature}>
-                  <Text style={styles.checkIcon}>✓</Text>
-                  <Text style={styles.securityText}>Real-time tracking</Text>
+                <View style={styles.modernSecurityFeature}>
+                  <Ionicons name="checkmark" size={16} color="#10B981" />
+                  <Text style={styles.modernSecurityText}>Real-time tracking</Text>
                 </View>
               </View>
             </View>
           </View>
-        </ScrollView>
+        </View>
+      </ScrollView>
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
+        {/* Modern Action Buttons */}
+        <View style={styles.modernActionButtons}>
           <Button
             title="Continue to Amount"
             onPress={handleContinue}
             loading={isValidating}
-            style={styles.continueButton}
-            textStyle={styles.continueButtonText}
+            style={styles.modernContinueButton}
+            textStyle={styles.modernContinueButtonText}
           />
           
           <Button
             title="Cancel"
             onPress={() => router.back()}
             variant="outline"
-            style={styles.cancelButton}
-            textStyle={styles.cancelButtonText}
+            style={styles.modernCancelButton}
+            textStyle={styles.modernCancelButtonText}
           />
         </View>
-      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  // 🎨 Base Layout
   safeArea: {
     flex: 1,
-    backgroundColor: '#fafbfc',
+    backgroundColor: '#F8FAFC',
   },
-  container: {
+
+  // 🌟 Modern Header
+  modernHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerContent: {
     flex: 1,
-    backgroundColor: '#fafbfc',
+    alignItems: 'center',
   },
-  scrollView: {
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  headerAction: {
+    width: 44,
+    height: 44,
+  },
+
+  // 📱 Modern Scroll
+  modernScrollView: {
     flex: 1,
   },
-  scrollContent: {
+  modernScrollContent: {
     flexGrow: 1,
     paddingBottom: 32,
   },
-  
-  // Hero Section
-  heroSection: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 32,
+
+  // 📝 Modern Form Section
+  modernFormSection: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  heroIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
-    backgroundColor: '#f0f9ff',
+  formHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  formIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#0ea5e9',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
+    marginBottom: 16,
   },
-  heroEmoji: {
-    fontSize: 32,
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
+  formTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1E3A8A',
     marginBottom: 8,
-    letterSpacing: -0.4,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
-  heroSubtitle: {
+  formSubtitle: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#6B7280',
+    fontWeight: '500',
     textAlign: 'center',
     lineHeight: 22,
   },
-  
-  // Main Card
-  mainCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.04,
-    shadowRadius: 24,
-    elevation: 8,
+  modernFormCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 20,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#E5E7EB',
+    gap: 24,
   },
-  
-  // Field Groups
-  fieldGroup: {
-    marginBottom: 24,
+
+  // 🏗️ Modern Field Groups
+  modernFieldGroup: {
+    gap: 12,
   },
-  fieldHeader: {
+  modernFieldHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: 12,
   },
-  fieldIcon: {
+  modernFieldIcon: {
     width: 32,
     height: 32,
-    borderRadius: 10,
-    backgroundColor: '#f8fafc',
-    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
-    marginRight: 12,
+    justifyContent: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  fieldEmoji: {
+  modernFieldLabel: {
     fontSize: 16,
-  },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: '#1E3A8A',
     flex: 1,
   },
   fieldHint: {
     fontSize: 13,
-    color: '#64748b',
+    color: '#9CA3AF',
     fontWeight: '500',
   },
-  
-  // Bank Detection
-  bankDetection: {
+  modernInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1E3A8A',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    fontWeight: '500',
+  },
+  fieldHelpText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+
+  // ✅ Modern Bank Detection
+  modernBankDetection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#F0FDF4',
     borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#dcfce7',
+    borderColor: '#BBF7D0',
+    gap: 12,
   },
-  bankIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#16a34a',
-    justifyContent: 'center',
+  modernBankIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#10B981',
     alignItems: 'center',
-    marginRight: 10,
+    justifyContent: 'center',
   },
-  bankEmoji: {
-    fontSize: 12,
-    color: '#ffffff',
+  modernBankName: {
+    fontSize: 16,
     fontWeight: '700',
-  },
-  bankName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#15803d',
+    color: '#065F46',
     flex: 1,
   },
-  
-  // Security Card
-  securityCard: {
-    backgroundColor: '#fefcf3',
+  bankVerifiedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+
+  // 🛡️ Modern Security Card
+  modernSecurityCard: {
+    backgroundColor: '#F0FDF4',
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#fed7aa',
+    borderColor: '#BBF7D0',
     marginTop: 8,
   },
-  securityHeader: {
+  modernSecurityHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    gap: 12,
   },
-  securityIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#f59e0b',
-    justifyContent: 'center',
+  modernSecurityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
-    marginRight: 10,
+    justifyContent: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  securityEmoji: {
-    fontSize: 14,
-    color: '#ffffff',
+  modernSecurityTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#065F46',
   },
-  securityTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#b45309',
+  modernSecurityFeatures: {
+    gap: 12,
   },
-  securityFeatures: {
-    gap: 10,
-  },
-  securityFeature: {
+  modernSecurityFeature: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  checkIcon: {
-    fontSize: 12,
-    color: '#16a34a',
-    fontWeight: '700',
-    marginRight: 10,
-    width: 16,
-  },
-  securityText: {
-    fontSize: 14,
-    color: '#b45309',
-    fontWeight: '500',
+  modernSecurityText: {
+    fontSize: 15,
+    color: '#047857',
+    fontWeight: '600',
     flex: 1,
   },
-  
-  // Action Buttons
-  actionButtons: {
-    padding: 20,
-    gap: 16,
-    backgroundColor: '#fafbfc',
+
+  // 🎯 Modern Action Buttons
+  modernActionButtons: {
+    padding: 16,
+    gap: 12,
+    backgroundColor: '#F8FAFC',
   },
-  continueButton: {
+  modernContinueButton: {
     height: 56,
     borderRadius: 16,
-    backgroundColor: '#2563eb',
-    shadowColor: '#2563eb',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
+    backgroundColor: '#3B82F6',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 8,
   },
-  continueButtonText: {
+  modernContinueButtonText: {
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  cancelButton: {
+  modernCancelButton: {
     height: 56,
     borderRadius: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.03,
+    borderColor: '#E5E7EB',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 4,
   },
-  cancelButtonText: {
+  modernCancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#64748b',
+    color: '#6B7280',
   },
 });

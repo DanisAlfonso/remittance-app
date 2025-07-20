@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useWalletStore } from '../../lib/walletStore';
 import { useAuthStore } from '../../lib/auth';
 import { apiClient } from '../../lib/api';
@@ -174,40 +175,51 @@ export default function SendMoneyScreen() {
   };
 
   const renderRecipientsStep = () => (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Send Money</Text>
-        <Text style={styles.subtitle}>Choose a recipient or add a new one</Text>
+    <View style={styles.stepContainer}>
+      {/* Modern Header */}
+      <View style={styles.modernHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Send Money</Text>
+          <Text style={styles.headerSubtitle}>Choose recipient</Text>
+        </View>
+        <View style={styles.headerAction} />
       </View>
 
-      <View style={styles.content}>
+      <View style={styles.modernContent}>
         {/* Add Recipient Button */}
-        <TouchableOpacity style={styles.addRecipientCard} onPress={handleAddRecipient}>
-          <View style={styles.addIconContainer}>
-            <Text style={styles.addIcon}>+</Text>
+        <TouchableOpacity style={styles.modernAddCard} onPress={handleAddRecipient}>
+          <View style={styles.modernIconContainer}>
+            <Ionicons name="add" size={24} color="#3B82F6" />
           </View>
-          <View style={styles.addRecipientContent}>
-            <Text style={styles.addRecipientTitle}>Add recipient</Text>
-            <Text style={styles.addRecipientSubtitle}>Send money to someone new</Text>
+          <View style={styles.modernCardContent}>
+            <Text style={styles.modernCardTitle}>Add New Recipient</Text>
+            <Text style={styles.modernCardSubtitle}>Send money to someone new</Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
         </TouchableOpacity>
 
         {/* Recent Recipients */}
         {isLoadingRecipients ? (
-          <View style={styles.recipientsSection}>
-            <Text style={styles.sectionTitle}>Recent recipients</Text>
-            <View style={styles.loadingCard}>
-              <Text style={styles.loadingText}>Loading recent recipients...</Text>
+          <View style={styles.modernSection}>
+            <Text style={styles.modernSectionTitle}>Recent Recipients</Text>
+            <View style={styles.modernLoadingCard}>
+              <ActivityIndicator size="small" color="#3B82F6" />
+              <Text style={styles.modernLoadingText}>Loading recipients...</Text>
             </View>
           </View>
         ) : recentRecipients.length > 0 ? (
-          <View style={styles.recipientsSection}>
-            <Text style={styles.sectionTitle}>Recent recipients</Text>
+          <View style={styles.modernSection}>
+            <Text style={styles.modernSectionTitle}>Recent Recipients</Text>
             {recentRecipients.map((recipient) => (
               <TouchableOpacity 
                 key={recipient.id} 
-                style={styles.recipientCard}
+                style={styles.modernRecipientCard}
                 onPress={() => {
                   // Navigate to transfer amount with recipient data
                   const recipientData = {
@@ -228,28 +240,36 @@ export default function SendMoneyScreen() {
                   });
                 }}
               >
-                <View style={styles.recipientAvatar}>
-                  <Text style={styles.recipientInitials}>
+                <View style={styles.modernAvatar}>
+                  <Text style={styles.modernInitials}>
                     {recipient.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                   </Text>
                 </View>
-                <View style={styles.recipientInfo}>
-                  <Text style={styles.recipientName}>{recipient.name}</Text>
-                  <Text style={styles.recipientDetails}>
-                    {recipient.email ? `${recipient.email} • ` : ''}
-                    {recipient.currency} • {recipient.lastUsed}
-                  </Text>
+                <View style={styles.modernRecipientInfo}>
+                  <Text style={styles.modernRecipientName}>{recipient.name}</Text>
+                  <View style={styles.recipientMetadata}>
+                    <Text style={styles.modernRecipientDetails}>
+                      {recipient.currency}
+                    </Text>
+                    <View style={styles.metadataDivider} />
+                    <Text style={styles.modernRecipientDetails}>
+                      {recipient.lastUsed}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={styles.chevron}>›</Text>
+                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
               </TouchableOpacity>
             ))}
           </View>
         ) : (
-          <View style={styles.recipientsSection}>
-            <Text style={styles.sectionTitle}>Recent recipients</Text>
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No recent recipients</Text>
-              <Text style={styles.emptySubtext}>Start by adding a new recipient above</Text>
+          <View style={styles.modernSection}>
+            <Text style={styles.modernSectionTitle}>Recent Recipients</Text>
+            <View style={styles.modernEmptyCard}>
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="people-outline" size={32} color="#D1D5DB" />
+              </View>
+              <Text style={styles.modernEmptyText}>No recent recipients</Text>
+              <Text style={styles.modernEmptySubtext}>Start by adding a new recipient above</Text>
             </View>
           </View>
         )}
@@ -258,44 +278,54 @@ export default function SendMoneyScreen() {
   );
 
   const renderCurrencyStep = () => (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Choose Currency</Text>
-        <Text style={styles.subtitle}>Select the currency you want to send</Text>
+    <View style={styles.stepContainer}>
+      {/* Modern Header */}
+      <View style={styles.modernHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setStep('recipients')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Choose Currency</Text>
+          <Text style={styles.headerSubtitle}>Select currency to send</Text>
+        </View>
+        <View style={styles.headerAction} />
       </View>
 
-      <View style={styles.content}>
+      <View style={styles.modernContent}>
         {/* Euros Option */}
         <TouchableOpacity 
-          style={styles.currencyCard} 
+          style={styles.modernCurrencyCard} 
           onPress={() => handleSelectCurrency('EUR')}
         >
-          <View style={styles.currencyIcon}>
-            <Text style={styles.currencyEmoji}>🇪🇺</Text>
+          <View style={styles.modernCurrencyIcon}>
+            <Ionicons name="card" size={24} color="#3B82F6" />
           </View>
-          <View style={styles.currencyContent}>
-            <Text style={styles.currencyTitle}>Euros</Text>
-            <Text style={styles.currencySubtitle}>Send EUR to Europe</Text>
+          <View style={styles.modernCardContent}>
+            <Text style={styles.modernCardTitle}>Euros (EUR)</Text>
+            <Text style={styles.modernCardSubtitle}>Send to European countries</Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
         </TouchableOpacity>
 
         {/* Other Currencies Section */}
-        <View style={styles.otherCurrenciesSection}>
-          <Text style={styles.sectionTitle}>Other currencies</Text>
+        <View style={styles.modernSection}>
+          <Text style={styles.modernSectionTitle}>Other Currencies</Text>
           
           <TouchableOpacity 
-            style={styles.currencyCard} 
+            style={styles.modernCurrencyCard} 
             onPress={() => handleSelectCurrency('HNL')}
           >
-            <View style={styles.currencyIcon}>
-              <Text style={styles.currencyEmoji}>🇭🇳</Text>
+            <View style={styles.modernCurrencyIcon}>
+              <Ionicons name="cash" size={24} color="#10B981" />
             </View>
-            <View style={styles.currencyContent}>
-              <Text style={styles.currencyTitle}>Honduran Lempira</Text>
-              <Text style={styles.currencySubtitle}>Send HNL to Honduras</Text>
+            <View style={styles.modernCardContent}>
+              <Text style={styles.modernCardTitle}>Honduran Lempira (HNL)</Text>
+              <Text style={styles.modernCardSubtitle}>Send to Honduras</Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -303,52 +333,62 @@ export default function SendMoneyScreen() {
   );
 
   const renderMethodStep = () => (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>
-          {selectedCurrency === 'EUR' ? 'Send Euros' : 'Send Lempira'}
-        </Text>
-        <Text style={styles.subtitle}>How do you want to send money?</Text>
+    <View style={styles.stepContainer}>
+      {/* Modern Header */}
+      <View style={styles.modernHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setStep('currency')}
+        >
+          <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>
+            {selectedCurrency === 'EUR' ? 'Send Euros' : 'Send Lempira'}
+          </Text>
+          <Text style={styles.headerSubtitle}>Choose transfer method</Text>
+        </View>
+        <View style={styles.headerAction} />
       </View>
 
-      <View style={styles.content}>
+      <View style={styles.modernContent}>
         {selectedCurrency === 'EUR' && (
           <TouchableOpacity 
-            style={styles.methodCard} 
+            style={styles.modernMethodCard} 
             onPress={() => handleSelectMethod('wise_user')}
           >
-            <View style={styles.methodIcon}>
-              <Text style={styles.methodEmoji}>👤</Text>
+            <View style={styles.modernMethodIcon}>
+              <Ionicons name="person" size={24} color="#8B5CF6" />
             </View>
-            <View style={styles.methodContent}>
-              <Text style={styles.methodTitle}>To an app user</Text>
-              <Text style={styles.methodSubtitle}>
+            <View style={styles.modernCardContent}>
+              <Text style={styles.modernCardTitle}>To App User</Text>
+              <Text style={styles.modernCardSubtitle}>
                 Search by username, email, or phone number
               </Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         )}
 
         <TouchableOpacity 
-          style={styles.methodCard} 
+          style={styles.modernMethodCard} 
           onPress={() => handleSelectMethod('bank_account')}
         >
-          <View style={styles.methodIcon}>
-            <Text style={styles.methodEmoji}>🏦</Text>
+          <View style={styles.modernMethodIcon}>
+            <Ionicons name="business" size={24} color="#F59E0B" />
           </View>
-          <View style={styles.methodContent}>
-            <Text style={styles.methodTitle}>
-              {selectedCurrency === 'EUR' ? 'To a bank account (IBAN)' : 'To a bank account'}
+          <View style={styles.modernCardContent}>
+            <Text style={styles.modernCardTitle}>
+              {selectedCurrency === 'EUR' ? 'To Bank Account (IBAN)' : 'To Bank Account'}
             </Text>
-            <Text style={styles.methodSubtitle}>
+            <Text style={styles.modernCardSubtitle}>
               {selectedCurrency === 'EUR' 
                 ? 'Enter recipient name and IBAN' 
                 : 'Enter recipient bank details'
               }
             </Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
         </TouchableOpacity>
       </View>
     </View>
@@ -368,361 +408,296 @@ export default function SendMoneyScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Header with back button */}
-        {step !== 'recipients' && (
-          <View style={styles.navigationHeader}>
-            <TouchableOpacity 
-              style={styles.backButton} 
-              onPress={() => {
-                if (step === 'currency') {
-                  setStep('recipients');
-                } else if (step === 'method') {
-                  setStep('currency');
-                } else {
-                  router.back();
-                }
-              }}
-            >
-              <Text style={styles.backIcon}>‹</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {renderStep()}
-        </ScrollView>
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView 
+        style={styles.modernScrollView}
+        contentContainerStyle={styles.modernScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {renderStep()}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  // 🎨 Base Layout
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8fafb',
+    backgroundColor: '#F8FAFC',
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafb',
-  },
-  navigationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#f8fafb',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backIcon: {
-    fontSize: 24,
-    color: '#374151',
-    fontWeight: '300',
-  },
-  scrollView: {
+  modernScrollView: {
     flex: 1,
   },
-  scrollContent: {
+  modernScrollContent: {
     flexGrow: 1,
-    paddingBottom: 40,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
     paddingBottom: 32,
   },
-  title: {
-    fontSize: 32,
+  stepContainer: {
+    flex: 1,
+  },
+
+  // 🌟 Modern Header
+  modernHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerContent: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1a1d29',
-    marginBottom: 8,
-    letterSpacing: -0.5,
+    color: '#1E3A8A',
+    letterSpacing: -0.3,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#64748b',
-    lineHeight: 24,
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  content: {
-    paddingHorizontal: 20,
+  headerAction: {
+    width: 44,
+    height: 44,
+  },
+
+  // 🏗️ Modern Content
+  modernContent: {
+    padding: 16,
     gap: 16,
   },
   
-  // Add Recipient Card
-  addRecipientCard: {
-    backgroundColor: '#ffffff',
+  // 💎 Modern Add Card
+  modernAddCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 20,
-    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowRadius: 24,
+    elevation: 12,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#F1F5F9',
+    gap: 16,
   },
-  addIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#eff6ff',
-    justifyContent: 'center',
+  modernIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#EEF2FF',
     alignItems: 'center',
-    marginRight: 16,
+    justifyContent: 'center',
   },
-  addIcon: {
-    fontSize: 24,
-    color: '#2563eb',
-    fontWeight: '300',
-  },
-  addRecipientContent: {
+  modernCardContent: {
     flex: 1,
   },
-  addRecipientTitle: {
+  modernCardTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
+    fontWeight: '700',
+    color: '#1E3A8A',
     marginBottom: 4,
+    letterSpacing: -0.3,
   },
-  addRecipientSubtitle: {
+  modernCardSubtitle: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#6B7280',
     fontWeight: '500',
-  },
-  chevron: {
-    fontSize: 20,
-    color: '#94a3b8',
-    fontWeight: '300',
+    lineHeight: 20,
   },
   
-  // Recipients Section
-  recipientsSection: {
+  // 🏗️ Modern Sections
+  modernSection: {
     marginTop: 24,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
+  modernSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E3A8A',
     marginBottom: 16,
     paddingHorizontal: 4,
     letterSpacing: -0.3,
   },
-  recipientCard: {
-    backgroundColor: '#ffffff',
+
+  // 📱 Modern Recipient Cards
+  modernRecipientCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
-    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#f8fafc',
+    borderColor: '#F1F5F9',
+    gap: 16,
   },
-  recipientAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e0e7ff',
-    justifyContent: 'center',
+  modernAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EEF2FF',
     alignItems: 'center',
-    marginRight: 12,
+    justifyContent: 'center',
   },
-  recipientInitials: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#3730a3',
+  modernInitials: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#3B82F6',
   },
-  recipientInfo: {
+  modernRecipientInfo: {
     flex: 1,
   },
-  recipientName: {
+  modernRecipientName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 6,
   },
-  recipientDetails: {
-    fontSize: 13,
-    color: '#64748b',
+  recipientMetadata: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modernRecipientDetails: {
+    fontSize: 12,
+    color: '#9CA3AF',
     fontWeight: '500',
   },
+  metadataDivider: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+  },
   
-  // Loading and Empty States
-  loadingCard: {
-    backgroundColor: '#ffffff',
+  // 🎭 Enhanced States
+  modernLoadingCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    justifyContent: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#f8fafc',
+    borderColor: '#F1F5F9',
+    gap: 12,
   },
-  loadingText: {
-    fontSize: 15,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  emptyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f8fafc',
-  },
-  emptyText: {
+  modernLoadingText: {
     fontSize: 16,
-    color: '#374151',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#64748b',
+    color: '#6B7280',
     fontWeight: '500',
+  },
+  modernEmptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    gap: 12,
+  },
+  emptyIconContainer: {
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    marginBottom: 8,
+  },
+  modernEmptyText: {
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: '700',
     textAlign: 'center',
   },
-  
-  // Currency Selection
-  currencyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    marginBottom: 12,
-  },
-  currencyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f8fafc',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  currencyEmoji: {
-    fontSize: 24,
-  },
-  currencyContent: {
-    flex: 1,
-  },
-  currencyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  currencySubtitle: {
+  modernEmptySubtext: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#6B7280',
     fontWeight: '500',
-  },
-  otherCurrenciesSection: {
-    marginTop: 24,
-  },
-  
-  // Method Selection
-  methodCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    marginBottom: 12,
-  },
-  methodIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f8fafc',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  methodEmoji: {
-    fontSize: 22,
-  },
-  methodContent: {
-    flex: 1,
-  },
-  methodTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  methodSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
+    textAlign: 'center',
     lineHeight: 20,
+  },
+  
+  // 💰 Modern Currency Cards
+  modernCurrencyCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 12,
+    gap: 16,
+  },
+  modernCurrencyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // 🎯 Modern Method Cards
+  modernMethodCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 16,
+    gap: 16,
+  },
+  modernMethodIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

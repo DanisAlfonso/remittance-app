@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { WiseAccount } from '../../types/wise';
+import type { BankAccount } from '../../types/banking';
 
 interface ComprehensiveBankingDetailsProps {
-  account: WiseAccount;
+  account: BankAccount;
   style?: object;
 }
 
@@ -115,14 +115,6 @@ export default function ComprehensiveBankingDetails({ account, style }: Comprehe
           />
         )}
 
-        {/* Account Number */}
-        {account.accountNumber && (
-          <CopyableField
-            label="Account Number"
-            value={account.accountNumber}
-            icon="card-outline"
-          />
-        )}
 
         {/* Routing Number */}
         {account.routingNumber && (

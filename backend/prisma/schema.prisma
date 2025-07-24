@@ -46,7 +46,7 @@ model User {
   sessions    Session[]
   transactions Transaction[]
   beneficiaries Beneficiary[]
-  wiseAccounts WiseAccount[]
+  bankAccounts BankAccount[]
   sentInternalTransfers     InternalTransfer[] @relation("Sender")
   receivedInternalTransfers InternalTransfer[] @relation("Recipient")
   
@@ -172,13 +172,51 @@ enum TransactionStatus {
   REFUNDED
 }
 
-model WiseAccount {
+
+model InternalTransfer {
+  id            String @id @default(cuid())
+  senderId      String
+  recipientId   String
+  amount        Decimal @db.Decimal(10, 2)
+  currency      String @db.VarChar(3)
+  
+  // Fee structure
+  platformFee   Decimal? @db.Decimal(10, 2)
+  
+  // Transfer details
+  note          String?
+  reference     String @unique @default(cuid())
+  status        InternalTransferStatus @default(PENDING)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+  
+  // Relations
+  sender        User @relation("Sender", fields: [senderId], references: [id])
+  recipient     User @relation("Recipient", fields: [recipientId], references: [id])
+  
+  @@map("internal_transfers")
+}
+
+enum InternalTransferStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ===========================================
+// BANKING MODELS - PROPER TERMINOLOGY
+// ===========================================
+
+model BankAccount {
   id            String   @id @default(cuid())
   userId        String
   
-  // Wise account details
-  wiseAccountId Int      @unique
-  wiseProfileId Int
+  // Bank account details
+  bankAccountId Int      @unique
+  bankProfileId Int
   currency      String   @db.VarChar(3)
   country       String   @db.VarChar(2)
   accountType   String   // SAVINGS, CHECKING
@@ -200,7 +238,7 @@ model WiseAccount {
   bankName      String?
   bankAddress   String?
   
-  // OAuth tokens
+  // OAuth tokens (if needed for some providers)
   accessToken   String?
   refreshToken  String?
   tokenExpiresAt DateTime?
@@ -215,17 +253,17 @@ model WiseAccount {
   
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions WiseTransaction[]
+  transactions BankTransaction[]
   
-  @@map("wise_accounts")
+  @@map("bank_accounts")
 }
 
-model WiseTransaction {
+model BankTransaction {
   id              String   @id @default(cuid())
-  wiseAccountId   String
+  bankAccountId   String
   
-  // Wise transaction details
-  wiseTransactionId Int?
+  // Transaction details
+  bankTransactionId Int?
   type            String   // DEPOSIT, WITHDRAWAL, TRANSFER, FEE
   status          String   @default("PENDING")
   amount          Decimal  @db.Decimal(10, 2)
@@ -257,19 +295,20 @@ model WiseTransaction {
   completedAt DateTime?
   
   // Relations
-  wiseAccount WiseAccount @relation(fields: [wiseAccountId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
   
-  @@map("wise_transactions")
+  @@map("bank_transactions")
 }
 
-enum WiseAccountStatus {
+// New Banking Enums with proper terminology
+enum BankAccountStatus {
   ACTIVE
   PENDING
   SUSPENDED
   CLOSED
 }
 
-enum WiseTransactionType {
+enum BankTransactionType {
   DEPOSIT
   WITHDRAWAL
   TRANSFER
@@ -277,42 +316,9 @@ enum WiseTransactionType {
   EXCHANGE
 }
 
-enum WiseTransactionStatus {
+enum BankTransactionStatus {
   PENDING
   PROCESSING
-  COMPLETED
-  FAILED
-  CANCELLED
-}
-
-model InternalTransfer {
-  id            String @id @default(cuid())
-  senderId      String
-  recipientId   String
-  amount        Decimal @db.Decimal(10, 2)
-  currency      String @db.VarChar(3)
-  
-  // Fee structure
-  platformFee   Decimal? @db.Decimal(10, 2)
-  
-  // Transfer details
-  note          String?
-  reference     String @unique @default(cuid())
-  status        InternalTransferStatus @default(PENDING)
-  
-  // Timestamps
-  createdAt     DateTime @default(now())
-  completedAt   DateTime?
-  
-  // Relations
-  sender        User @relation("Sender", fields: [senderId], references: [id])
-  recipient     User @relation("Recipient", fields: [recipientId], references: [id])
-  
-  @@map("internal_transfers")
-}
-
-enum InternalTransferStatus {
-  PENDING
   COMPLETED
   FAILED
   CANCELLED

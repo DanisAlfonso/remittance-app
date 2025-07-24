@@ -12,11 +12,7 @@ interface EnvironmentConfig {
   BCRYPT_ROUNDS: number;
   RATE_LIMIT_WINDOW_MS: number;
   RATE_LIMIT_MAX_REQUESTS: number;
-  WISE_BASE_URL: string;
-  WISE_CLIENT_ID: string;  
-  WISE_CLIENT_SECRET: string;
-  WISE_REDIRECT_URI: string;
-  WISE_WEBHOOK_SECRET: string;
+  // Removed legacy service configuration - now using pure banking APIs
   // OBP-API configuration
   OBP_API_BASE_URL: string;
   OBP_CONSUMER_KEY: string;
@@ -47,11 +43,7 @@ function validateEnvironment(): EnvironmentConfig {
     BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
     RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
     RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
-    WISE_BASE_URL: process.env.WISE_BASE_URL || 'https://api.sandbox.transferwise.tech',
-    WISE_CLIENT_ID: process.env.WISE_CLIENT_ID || 'sandbox-client-id',
-    WISE_CLIENT_SECRET: process.env.WISE_CLIENT_SECRET || 'sandbox-client-secret',
-    WISE_REDIRECT_URI: process.env.WISE_REDIRECT_URI || 'my-app://callback',
-    WISE_WEBHOOK_SECRET: process.env.WISE_WEBHOOK_SECRET || 'sandbox-webhook-secret',
+    // Legacy service configuration removed - using pure banking APIs
     // OBP-API defaults (using the values from our successful OBP-API setup)
     OBP_API_BASE_URL: process.env.OBP_API_BASE_URL || 'http://127.0.0.1:8080',
     OBP_CONSUMER_KEY: process.env.OBP_CONSUMER_KEY || 'vttcad5o5fas3tmuifj5stclbuei4letdtstk4zu',

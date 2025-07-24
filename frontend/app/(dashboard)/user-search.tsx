@@ -71,14 +71,14 @@ export default function UserSearchScreen() {
 
   const handleSelectUser = (user: SearchResult) => {
     // Navigate to transfer amount screen with selected user (@username transfer)
-    // This will trigger IBAN lookup and real bank transfer via Wise API
+    // This will trigger IBAN lookup and real bank transfer via OBP-API
     router.push({
       pathname: '/(dashboard)/transfer-amount',
       params: {
         recipientId: user.id,
         recipientName: user.displayName,
         recipientUsername: user.username || '',
-        transferType: 'user', // @username transfer (will lookup IBAN and use Wise API)
+        transferType: 'user', // @username transfer (will lookup IBAN and use OBP-API)
         currency: currency || 'EUR'
       }
     });

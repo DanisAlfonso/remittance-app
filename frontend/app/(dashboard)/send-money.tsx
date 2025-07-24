@@ -44,8 +44,8 @@ export default function SendMoneyScreen() {
     
     setIsLoadingRecipients(true);
     try {
-      // Fetch user's transfer history from wise transfers
-      const response = await apiClient.get('/wise/transfers', {
+      // Fetch user's transfer history from OBP transaction requests
+      const response = await apiClient.obpGet('/obp/v5.1.0/transaction-requests', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -158,7 +158,7 @@ export default function SendMoneyScreen() {
     setStep('method');
   };
 
-  const handleSelectMethod = (method: 'wise_user' | 'bank_account') => {
+  const handleSelectMethod = (method: 'app_user' | 'bank_account') => {
     if (method === 'bank_account') {
       // Navigate to add recipient form
       router.push({
@@ -355,7 +355,7 @@ export default function SendMoneyScreen() {
         {selectedCurrency === 'EUR' && (
           <TouchableOpacity 
             style={styles.modernMethodCard} 
-            onPress={() => handleSelectMethod('wise_user')}
+            onPress={() => handleSelectMethod('app_user')}
           >
             <View style={styles.modernMethodIcon}>
               <Ionicons name="person" size={24} color="#8B5CF6" />

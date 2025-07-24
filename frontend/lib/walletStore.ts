@@ -1,8 +1,13 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import * as SecureStore from 'expo-secure-store';
-import { wiseService } from './wise';
-import type { WiseAccount, WiseBalance, CreateWiseAccountRequest, WiseError } from '../types/wise';
+import { bankingService } from './bankingService';
+import type { 
+  BankAccount, 
+  AccountBalance, 
+  CreateBankAccountRequest, 
+  BankingError
+} from '../types/banking';
 
 // Secure storage adapter for Zustand
 const secureStorage = {
@@ -30,9 +35,9 @@ const secureStorage = {
 };
 
 interface WalletState {
-  accounts: WiseAccount[];
-  selectedAccount: WiseAccount | null;
-  balance: WiseBalance | null;
+  accounts: BankAccount[];
+  selectedAccount: BankAccount | null;
+  balance: AccountBalance | null;
   isLoading: boolean;
   error: string | null;
   isInitialized: boolean;
@@ -41,7 +46,7 @@ interface WalletState {
 
 interface WalletActions {
   // Account management
-  createAccount: (request: CreateWiseAccountRequest) => Promise<void>;
+  createAccount: (request: CreateBankAccountRequest) => Promise<void>;
   loadAccounts: () => Promise<void>;
   selectAccount: (accountId: string) => void;
   refreshBalance: (accountId?: string) => Promise<void>;
@@ -67,11 +72,11 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       userId: null,
 
       // Actions
-      createAccount: async (request: CreateWiseAccountRequest) => {
+      createAccount: async (request: CreateBankAccountRequest) => {
         set({ isLoading: true, error: null });
         
         try {
-          const response = await wiseService.createAccount(request);
+          const response = await bankingService.createAccount(request);
           
           // Add new account to the list
           const { accounts } = get();
@@ -84,10 +89,10 @@ export const useWalletStore = create<WalletState & WalletActions>()(
             error: null,
           });
         } catch (error) {
-          const wiseError = error as WiseError;
+          const bankingError = error as BankingError;
           set({
             isLoading: false,
-            error: wiseError.message || 'Failed to create account',
+            error: bankingError.message || 'Failed to create account',
           });
           throw error;
         }
@@ -97,7 +102,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
         set({ isLoading: true, error: null });
         
         try {
-          const response = await wiseService.getAccounts();
+          const response = await bankingService.getAccounts();
           
           set({
             accounts: response.accounts,
@@ -107,10 +112,10 @@ export const useWalletStore = create<WalletState & WalletActions>()(
             isInitialized: true,
           });
         } catch (error) {
-          const wiseError = error as WiseError;
+          const bankingError = error as BankingError;
           set({
             isLoading: false,
-            error: wiseError.message || 'Failed to load accounts',
+            error: bankingError.message || 'Failed to load accounts',
             isInitialized: true,
           });
         }
@@ -140,7 +145,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
         set({ isLoading: true, error: null });
         
         try {
-          const response = await wiseService.getAccountBalance(targetAccountId);
+          const response = await bankingService.getAccountBalance(targetAccountId);
           
           set({
             balance: response.balance,
@@ -148,10 +153,10 @@ export const useWalletStore = create<WalletState & WalletActions>()(
             error: null,
           });
         } catch (error) {
-          const wiseError = error as WiseError;
+          const bankingError = error as BankingError;
           set({
             isLoading: false,
-            error: wiseError.message || 'Failed to refresh balance',
+            error: bankingError.message || 'Failed to refresh balance',
           });
         }
       },

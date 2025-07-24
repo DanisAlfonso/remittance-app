@@ -219,7 +219,7 @@ export class OBPApiService {
    * Get all available banks from OBP-API
    */
   async getBanks(): Promise<BankingApiResponse<OBPBank[]>> {
-    const result = await this.makeRequest<{ banks: OBPBank[] }>('/obp/v4.0.0/banks');
+    const result = await this.makeRequest<{ banks: OBPBank[] }>('/obp/v5.1.0/banks');
     
     if (result.success && result.data) {
       return {
@@ -258,7 +258,7 @@ export class OBPApiService {
       console.log(`🏦 Using bank: ${targetBank.full_name} (${targetBank.id})`);
 
       // Get the OBP user ID (not our app's user ID)
-      const userResult = await this.makeRequest<{ user_id: string }>('/obp/v4.0.0/users/current');
+      const userResult = await this.makeRequest<{ user_id: string }>('/obp/v5.1.0/users/current');
       if (!userResult.success || !userResult.data?.user_id) {
         throw new Error('Could not get OBP user ID');
       }
@@ -299,7 +299,7 @@ export class OBPApiService {
         branch_id: string;
         account_routings: Array<{ scheme: string; address: string }>;
       }>(
-        `/obp/v4.0.0/banks/${targetBank.id}/accounts`,
+        `/obp/v5.1.0/banks/${targetBank.id}/accounts`,
         {
           method: 'POST',
           body: JSON.stringify(accountData),
@@ -356,7 +356,7 @@ export class OBPApiService {
   /**
    * Get account balance from OBP-API (REAL API ONLY)
    */
-  async getAccountBalance(accountId: string, currency: string): Promise<BankingApiResponse<{
+  async getAccountBalance(accountId: string): Promise<BankingApiResponse<{
     id: number;
     currency: string;
     amount: { value: number; currency: string };
@@ -367,7 +367,7 @@ export class OBPApiService {
     
     try {
       // Get balance from real OBP-API
-      const result = await this.makeRequest<{ accounts: Array<{ id: string; balance: { currency: string; amount: string }; account_routings?: Array<{ address: string }> }> }>(`/obp/v4.0.0/my/accounts`);
+      const result = await this.makeRequest<{ accounts: Array<{ id: string; balance: { currency: string; amount: string }; account_routings?: Array<{ address: string }> }> }>(`/obp/v5.1.0/my/accounts`);
       
       if (result.success && result.data && 'accounts' in result.data && Array.isArray(result.data.accounts)) {
         const account = result.data.accounts.find((acc: { id: string; account_routings?: Array<{ address: string }> }) => 
@@ -375,7 +375,8 @@ export class OBPApiService {
         );
         
         if (account && 'balance' in account && account.balance) {
-          console.log(`✅ Found REAL OBP balance: ${(account.balance as any).amount} ${(account.balance as any).currency}`);
+          const balance = account.balance as { currency: string; amount: string };
+          console.log(`✅ Found REAL OBP balance: ${balance.amount} ${balance.currency}`);
           return {
             success: true,
             data: {
@@ -413,7 +414,7 @@ export class OBPApiService {
     console.log(`📋 Getting REAL OBP account details for ${bankId}/${accountId}`);
     
     try {
-      const result = await this.makeRequest<OBPAccount>(`/obp/v4.0.0/banks/${bankId}/accounts/${accountId}/owner/account`);
+      const result = await this.makeRequest<OBPAccount>(`/obp/v5.1.0/banks/${bankId}/accounts/${accountId}/owner/account`);
       
       if (result.success && result.data) {
         const obpAccount = result.data;
@@ -458,7 +459,7 @@ export class OBPApiService {
     
     try {
       // Test root endpoint
-      const rootResult = await this.makeRequest<{ version: string }>('/obp/v4.0.0/root');
+      const rootResult = await this.makeRequest<{ version: string }>('/obp/v5.1.0/root');
       if (rootResult.success) {
         features.push('✅ API Root access');
         console.log('✅ OBP-API root endpoint working');
@@ -472,7 +473,7 @@ export class OBPApiService {
       }
       
       // Test user access
-      const userResult = await this.makeRequest<{ user_id: string }>('/obp/v4.0.0/users/current');
+      const userResult = await this.makeRequest<{ user_id: string }>('/obp/v5.1.0/users/current');
       if (userResult.success) {
         features.push('✅ User authentication');
         console.log('✅ OBP-API user authentication working');
@@ -489,6 +490,272 @@ export class OBPApiService {
         features,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
+    }
+  }
+
+  /**
+   * Create test accounts for current user via OBP-API
+   * Creates accounts with zero balance - simplified approach focusing on account creation first
+   */
+  async importSandboxData(): Promise<BankingApiResponse<{
+    banks: Array<{
+      id: string;
+      short_name: string;
+      full_name: string;
+      accounts_imported: number;
+    }>;
+    total_accounts: number;
+    total_transactions: number;
+    created_accounts: Array<{
+      obp_account_id: string;
+      obp_bank_id: string;
+      currency: string;
+      label: string;
+      type: string;
+    }>;
+  }>> {
+    console.log('📦 Creating test accounts for current user via OBP-API...');
+    
+    try {
+      // Create test accounts with zero balance - skip transaction creation for now
+      // Focus on getting accounts created successfully first
+      
+      const banksResult = await this.getBanks();
+      if (!banksResult.success || !banksResult.data || banksResult.data.length === 0) {
+        throw new Error('No banks available for account creation');
+      }
+
+      const targetBank = banksResult.data.find(bank => bank.id === 'ENHANCEDBANK');
+      if (!targetBank) {
+        throw new Error('ENHANCEDBANK not found - required for test account creation');
+      }
+
+      // Get current OBP user
+      const userResult = await this.makeRequest<{ user_id: string }>('/obp/v5.1.0/users/current');
+      if (!userResult.success || !userResult.data?.user_id) {
+        throw new Error('Could not get OBP user ID');
+      }
+      
+      const obpUserId = userResult.data.user_id;
+      console.log(`👤 Using OBP user ID: ${obpUserId}`);
+
+      // Simple test accounts - just create them, don't worry about funding for now
+      const testAccounts = [
+        { currency: 'EUR', label: 'Test EUR Account', type: 'SAVINGS' },
+        { currency: 'USD', label: 'Test USD Account', type: 'CURRENT' },
+        { currency: 'GBP', label: 'Test GBP Account', type: 'BUSINESS' }
+      ];
+
+      let accountsCreated = 0;
+      let transactionsCreated = 0; // Will be 0 for now
+      const createdAccounts: Array<{ obp_account_id: string; obp_bank_id: string; currency: string; label: string; type: string }> = [];
+
+      console.log(`🏗️ Creating ${testAccounts.length} test accounts with zero balance...`);
+
+      for (const testAccount of testAccounts) {
+        try {
+          const accountData = {
+            user_id: obpUserId,
+            label: testAccount.label,
+            product_code: `${testAccount.currency}_${testAccount.type}`,
+            balance: {
+              currency: testAccount.currency,
+              amount: "0"  // Start with zero balance - simplify for now
+            },
+            branch_id: 'BRANCH1'
+          };
+
+          console.log(`💳 Creating ${testAccount.currency} account...`);
+
+          const createResult = await this.makeRequest<{
+            account_id: string;
+            balance: { currency: string; amount: string };
+          }>(
+            `/obp/v5.1.0/banks/${targetBank.id}/accounts`,
+            {
+              method: 'POST',
+              body: JSON.stringify(accountData),
+            }
+          );
+
+          if (createResult.success && createResult.data) {
+            accountsCreated++;
+            const obpAccountId = createResult.data.account_id;
+            console.log(`✅ Created ${testAccount.currency} account: ${obpAccountId}`);
+            
+            // Track created account for database storage
+            createdAccounts.push({
+              obp_account_id: obpAccountId,
+              obp_bank_id: targetBank.id,
+              currency: testAccount.currency,
+              label: testAccount.label,
+              type: testAccount.type,
+            });
+          } else {
+            console.error(`❌ Failed to create ${testAccount.currency} account:`, createResult.error);
+          }
+        } catch (accountError) {
+          console.error(`❌ Error creating ${testAccount.currency} account:`, accountError);
+        }
+      }
+
+      console.log(`🎉 Test account creation completed!`);
+      console.log(`✅ Created ${accountsCreated} accounts`);
+      console.log(`✅ Transactions: ${transactionsCreated} (accounts created with zero balance)`);
+
+      return {
+        success: true,
+        data: {
+          banks: [
+            {
+              id: targetBank.id,
+              short_name: targetBank.short_name,
+              full_name: targetBank.full_name,
+              accounts_imported: accountsCreated,
+            }
+          ],
+          total_accounts: accountsCreated,
+          total_transactions: transactionsCreated,
+          created_accounts: createdAccounts,
+        },
+        statusCode: 201,
+      };
+    } catch (error) {
+      console.error('❌ Sandbox data creation failed completely:', error);
+      throw new Error(`Failed to create sandbox data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create test deposit for specific account (Superuser only)
+   * Using OBP-API v5.1.0 sandbox transaction creation
+   */
+  async createTestDeposit(
+    bankId: string,
+    accountId: string,
+    amount: number,
+    currency: string,
+    description?: string
+  ): Promise<BankingApiResponse<{
+    transaction_id: string;
+    account_id: string;
+    amount: { currency: string; amount: string };
+    description: string;
+    posted: string;
+  }>> {
+    console.log(`💰 Creating test deposit: ${amount} ${currency} to account ${accountId}`);
+    
+    try {
+      // Try direct transaction creation via OBP-API sandbox endpoint
+      // This approach creates transactions directly without transaction requests
+      const transactionData = {
+        type: 'SANDBOX_TAN',
+        description: description || `Test deposit - ${amount} ${currency}`,
+        posted: new Date().toISOString(),
+        completed: new Date().toISOString(),
+        value: {
+          currency: currency,
+          amount: amount.toString()
+        },
+        other_account: {
+          holder: {
+            name: 'OBP Test System'
+          },
+          number: 'TEST_DEPOSIT_SYSTEM',
+          kind: 'SYSTEM'
+        }
+      };
+
+      console.log('📋 Creating direct sandbox transaction:', JSON.stringify(transactionData, null, 2));
+
+      // First, try the direct transaction creation endpoint (sandbox-specific)
+      const createResult = await this.makeRequest<{
+        id: string;
+        this_account: { id: string; bank_id: string };
+        other_account: any;
+        details: any;
+        metadata: any;
+      }>(
+        `/obp/v5.1.0/banks/${bankId}/accounts/${accountId}/transactions`,
+        {
+          method: 'POST',
+          body: JSON.stringify(transactionData),
+        }
+      );
+
+      if (createResult.success && createResult.data) {
+        console.log(`✅ Direct sandbox transaction created: ${createResult.data.id}`);
+
+        return {
+          success: true,
+          data: {
+            transaction_id: createResult.data.id,
+            account_id: accountId,
+            amount: { currency: currency, amount: amount.toString() },
+            description: description || `Test deposit - ${amount} ${currency}`,
+            posted: new Date().toISOString(),
+          },
+          statusCode: 201,
+        };
+      }
+
+      // If direct transaction fails, try transaction request approach
+      console.log('🔄 Direct transaction failed, trying transaction request approach...');
+      console.error('Direct transaction error:', createResult.error);
+
+      // Create a "from" account for the transaction request (system account)
+      const transactionRequestData = {
+        to: {
+          bank_id: bankId,
+          account_id: accountId
+        },
+        value: {
+          currency: currency,
+          amount: amount.toString()
+        },
+        description: description || `Test deposit - ${amount} ${currency}`,
+        challenge_type: 'SANDBOX_TAN'
+      };
+
+      console.log('📋 Creating transaction request (fallback):', JSON.stringify(transactionRequestData, null, 2));
+
+      const requestResult = await this.makeRequest<{
+        id: string;
+        type: string;
+        from: { bank_id: string; account_id: string };
+        details: any;
+        body: any;
+        status: string;
+      }>(
+        `/obp/v5.1.0/transaction-requests`,
+        {
+          method: 'POST',
+          body: JSON.stringify(transactionRequestData),
+        }
+      );
+
+      if (!requestResult.success) {
+        console.error('❌ Transaction request also failed:', requestResult.error);
+        throw new Error(`Both transaction creation methods failed. Direct: ${createResult.error?.error_description}, Request: ${requestResult.error?.error_description}`);
+      }
+
+      console.log(`✅ Transaction request created (fallback): ${requestResult.data?.id}`);
+
+      // Return in the expected format
+      return {
+        success: true,
+        data: {
+          transaction_id: requestResult.data?.id || 'unknown',
+          account_id: accountId,
+          amount: { currency: currency, amount: amount.toString() },
+          description: description || `Test deposit - ${amount} ${currency}`,
+          posted: new Date().toISOString(),
+        },
+        statusCode: 201,
+      };
+    } catch (error) {
+      console.error('❌ Test deposit creation failed completely:', error);
+      throw new Error(`Failed to create test deposit: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

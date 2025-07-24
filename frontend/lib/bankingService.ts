@@ -1,73 +1,56 @@
 import { apiClient } from './api';
 import type { 
-  WiseAccount, 
-  WiseBalance, 
-  WiseTransaction, 
-  CreateWiseAccountRequest, 
-  WiseAuthResponse, 
-  WiseProfile
-} from '../types/wise';
+  BankAccount, 
+  CreateBankAccountRequest,
+  CreateAccountResponse,
+  GetAccountsResponse,
+  GetBalanceResponse,
+  GetAccountDetailsResponse
+} from '../types/banking';
 
-export class WiseService {
+/**
+ * Banking Service - OBP-API Integration
+ * Provides banking functionality through Open Bank Project API
+ * Includes utility functions for account management and data formatting
+ */
+export class BankingService {
   /**
-   * Generate OAuth authorization URL
+   * Create a new bank account via OBP-API (NEW BANKING API)
    */
-  async getAuthUrl(): Promise<WiseAuthResponse> {
-    const response = await apiClient.get<{ authUrl: string; state: string }>('/wise/auth/url');
+  async createAccount(request: CreateBankAccountRequest): Promise<CreateAccountResponse> {
+    const response = await apiClient.post<CreateAccountResponse>('/banking/accounts', request);
     return response;
   }
 
   /**
-   * Handle OAuth callback
+   * Get all user's bank accounts (NEW BANKING API)
    */
-  async handleAuthCallback(code: string, state: string): Promise<{ profile: WiseProfile }> {
-    const response = await apiClient.post<{ profile: WiseProfile }>('/wise/auth/callback', {
-      code,
-      state,
-    });
+  async getAccounts(): Promise<GetAccountsResponse> {
+    const response = await apiClient.get<GetAccountsResponse>('/banking/accounts');
     return response;
   }
 
   /**
-   * Create a new Wise account
+   * Get account balance (NEW BANKING API)
    */
-  async createAccount(request: CreateWiseAccountRequest): Promise<{ account: WiseAccount }> {
-    const response = await apiClient.post<{ account: WiseAccount }>('/wise/accounts', request);
+  async getAccountBalance(accountId: string): Promise<GetBalanceResponse> {
+    const response = await apiClient.get<GetBalanceResponse>(`/banking/accounts/${accountId}/balance`);
     return response;
   }
 
   /**
-   * Get all user's Wise accounts
+   * Get detailed account information (NEW BANKING API)
    */
-  async getAccounts(): Promise<{ accounts: WiseAccount[] }> {
-    const response = await apiClient.get<{ accounts: WiseAccount[] }>('/wise/accounts');
+  async getAccountDetails(accountId: string): Promise<GetAccountDetailsResponse> {
+    const response = await apiClient.get<GetAccountDetailsResponse>(`/banking/accounts/${accountId}`);
     return response;
   }
 
-  /**
-   * Get account balance
-   */
-  async getAccountBalance(accountId: string): Promise<{ balance: WiseBalance }> {
-    const response = await apiClient.get<{ balance: WiseBalance }>(`/wise/accounts/${accountId}/balance`);
-    return response;
-  }
-
-  /**
-   * Get detailed account information
-   */
-  async getAccountDetails(accountId: string): Promise<{ 
-    account: WiseAccount & { recentTransactions: WiseTransaction[] } 
-  }> {
-    const response = await apiClient.get<{ 
-      account: WiseAccount & { recentTransactions: WiseTransaction[] } 
-    }>(`/wise/accounts/${accountId}`);
-    return response;
-  }
 
   /**
    * Format account number for display
    */
-  formatAccountNumber(account: WiseAccount): string {
+  formatAccountNumber(account: BankAccount): string {
     if (account.iban) {
       return this.formatIban(account.iban);
     }
@@ -288,4 +271,4 @@ export class WiseService {
   }
 }
 
-export const wiseService = new WiseService();
+export const bankingService = new BankingService();

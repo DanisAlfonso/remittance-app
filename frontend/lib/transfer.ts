@@ -58,7 +58,7 @@ export class TransferService {
       reference?: string;
     };
   }): Promise<{ transfer: Transfer }> {
-    const response = await apiClient.post<{ transfer: Transfer }>('/wise/transfers', transferData);
+    const response = await apiClient.obpPost<{ transfer: Transfer }>('/obp/v5.1.0/transaction-requests', transferData);
     return response;
   }
 
@@ -77,10 +77,10 @@ export class TransferService {
     transfers: Transfer[]; 
     pagination: { limit: number; offset: number; total: number } 
   }> {
-    const response = await apiClient.get<{ 
+    const response = await apiClient.obpGet<{ 
       transfers: Transfer[]; 
       pagination: { limit: number; offset: number; total: number } 
-    }>(`/wise/transfers?limit=${limit}&offset=${offset}`);
+    }>(`/obp/v5.1.0/transaction-requests?limit=${limit}&offset=${offset}`);
     return response;
   }
 
@@ -91,16 +91,16 @@ export class TransferService {
     message: string;
     transferId: string;
     newStatus: string;
-    wiseStatus: string;
+    bankingStatus: string;
     timestamp: string;
   }> {
-    const response = await apiClient.post<{
+    const response = await apiClient.obpPost<{
       message: string;
       transferId: string;
       newStatus: string;
-      wiseStatus: string;
+      bankingStatus: string;
       timestamp: string;
-    }>(`/wise/transfers/${transferId}/simulate-status`, { status });
+    }>(`/obp/v5.1.0/transaction-requests/${transferId}/simulate-status`, { status });
     return response;
   }
 

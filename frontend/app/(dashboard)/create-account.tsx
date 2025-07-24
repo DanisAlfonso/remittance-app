@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useWalletStore } from '../../lib/walletStore';
 import { useAuthStore } from '../../lib/auth';
 import Button from '../../components/ui/Button';
-import type { CreateWiseAccountRequest } from '../../types/wise';
+import type { CreateBankAccountRequest } from '../../types/banking';
 
 export default function CreateAccountScreen() {
   const { user } = useAuthStore();
@@ -40,7 +40,7 @@ export default function CreateAccountScreen() {
     clearError();
     
     try {
-      const request: CreateWiseAccountRequest = {
+      const request: CreateBankAccountRequest = {
         name: generateAccountName(),
         currency: formData.currency,
         country: formData.country,

@@ -5,8 +5,8 @@ import morgan from 'morgan';
 import { env } from './config/environment';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth';
-import bankingRoutes from './routes/banking';
-import transferRoutes from './routes/transfer';
+import bankingRoutes from './routes/banking-v2';
+import obpRoutes from './routes/obp-v5';
 import usersRoutes from './routes/users';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
@@ -39,8 +39,8 @@ app.get('/api/v1/health', (req, res) => {
 });
 
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/wise', bankingRoutes);
-app.use('/api/v1/transfer', transferRoutes);
+app.use('/api/v1/banking', bankingRoutes); // Legacy endpoints (temporary)
+app.use('/obp/v5.1.0', obpRoutes); // OBP-API compliant endpoints
 app.use('/api/v1/users', usersRoutes);
 
 app.use((req, res, next) => {

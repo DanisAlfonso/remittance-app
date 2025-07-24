@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { wiseService } from '../../lib/wise';
+import { bankingService } from '../../lib/bankingService';
 
 interface IbanDisplayProps {
   iban: string;
@@ -40,7 +40,7 @@ export default function IbanDisplay({ iban, accountName, currency, style }: Iban
     return iban.replace(/(.{4})/g, '$1 ').trim();
   };
 
-  const displayIban = isRevealed ? formatIbanForDisplay(iban) : wiseService.formatIban(iban);
+  const displayIban = isRevealed ? formatIbanForDisplay(iban) : bankingService.formatIban(iban);
 
   return (
     <View style={[styles.container, style]}>

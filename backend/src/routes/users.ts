@@ -78,7 +78,7 @@ const searchUsers: RequestHandler = async (req: AuthRequest, res) => {
       },
       select: {
         id: true,
-        wiseAccounts: {
+        bankAccounts: {
           where: {
             status: 'ACTIVE',
           },
@@ -94,7 +94,7 @@ const searchUsers: RequestHandler = async (req: AuthRequest, res) => {
     const accountMap = new Map(
       usersWithAccounts.map(user => [
         user.id, 
-        user.wiseAccounts[0] || null
+        user.bankAccounts[0] || null
       ])
     );
 
@@ -263,7 +263,7 @@ const updateProfile: RequestHandler = async (req: AuthRequest, res) => {
 /**
  * Get user by ID for transfers (with IBAN information)
  * This endpoint returns user information including their primary account IBAN
- * for real bank transfers via Wise API
+ * for real bank transfers via banking API
  */
 const getUserById: RequestHandler = async (req: AuthRequest, res) => {
   try {
@@ -291,7 +291,7 @@ const getUserById: RequestHandler = async (req: AuthRequest, res) => {
         lastName: true,
         email: true,
         createdAt: true,
-        wiseAccounts: {
+        bankAccounts: {
           where: {
             status: 'ACTIVE',
           },
@@ -319,7 +319,7 @@ const getUserById: RequestHandler = async (req: AuthRequest, res) => {
     }
     
     // Check if user has an active account with IBAN
-    const primaryAccount = user.wiseAccounts[0];
+    const primaryAccount = user.bankAccounts[0];
     if (!primaryAccount || !primaryAccount.iban) {
       res.status(404).json({
         error: 'User does not have an active account available for transfers'

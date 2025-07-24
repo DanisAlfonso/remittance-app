@@ -225,7 +225,7 @@ export default function TransferAmountScreen() {
         });
       }
       
-      // All transfers now go through Wise API as real bank transfers
+      // All transfers now go through OBP-API as real bank transfers
       const transferData = {
         recipientAccount: {
           type: 'iban',
@@ -234,7 +234,7 @@ export default function TransferAmountScreen() {
           currency: finalRecipientData.currency,
           country: finalRecipientData.country,
           holderName: finalRecipientData.holderName,
-          bankName: finalRecipientData.bankName || 'Wise Account',
+          bankName: finalRecipientData.bankName || 'Banking Account',
         },
         recipientDetails: {
           firstName: finalRecipientData.holderName?.split(' ')[0] || 'Unknown',
@@ -250,8 +250,8 @@ export default function TransferAmountScreen() {
         }
       };
       
-      console.log('💸 Executing real bank transfer via Wise API...');
-      const response = await apiClient.post('/wise/transfers', transferData, {
+      console.log('💸 Executing real bank transfer via OBP-API...');
+      const response = await apiClient.obpPost('/obp/v5.1.0/transaction-requests', transferData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

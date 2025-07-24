@@ -57,7 +57,7 @@ export default function BeneficiariesScreen() {
     setIsLoading(true);
     try {
       // Load recent recipients from transfer history
-      const transferResponse = await apiClient.get('/wise/transfers', {
+      const transferResponse = await apiClient.obpGet('/obp/v5.1.0/transaction-requests', {
         headers: { Authorization: `Bearer ${token}` }
       });
       

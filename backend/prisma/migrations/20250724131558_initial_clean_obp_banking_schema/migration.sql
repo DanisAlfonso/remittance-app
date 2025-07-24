@@ -8,16 +8,16 @@ CREATE TYPE "TransactionType" AS ENUM ('DEPOSIT', 'WITHDRAWAL', 'TRANSFER', 'EXC
 CREATE TYPE "TransactionStatus" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED');
 
 -- CreateEnum
-CREATE TYPE "WiseAccountStatus" AS ENUM ('ACTIVE', 'PENDING', 'SUSPENDED', 'CLOSED');
-
--- CreateEnum
-CREATE TYPE "WiseTransactionType" AS ENUM ('DEPOSIT', 'WITHDRAWAL', 'TRANSFER', 'FEE', 'EXCHANGE');
-
--- CreateEnum
-CREATE TYPE "WiseTransactionStatus" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED');
-
--- CreateEnum
 CREATE TYPE "InternalTransferStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "BankAccountStatus" AS ENUM ('ACTIVE', 'PENDING', 'SUSPENDED', 'CLOSED');
+
+-- CreateEnum
+CREATE TYPE "BankTransactionType" AS ENUM ('DEPOSIT', 'WITHDRAWAL', 'TRANSFER', 'FEE', 'EXCHANGE');
+
+-- CreateEnum
+CREATE TYPE "BankTransactionStatus" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -104,16 +104,35 @@ CREATE TABLE "beneficiaries" (
 );
 
 -- CreateTable
-CREATE TABLE "wise_accounts" (
+CREATE TABLE "internal_transfers" (
+    "id" TEXT NOT NULL,
+    "senderId" TEXT NOT NULL,
+    "recipientId" TEXT NOT NULL,
+    "amount" DECIMAL(10,2) NOT NULL,
+    "currency" VARCHAR(3) NOT NULL,
+    "platformFee" DECIMAL(10,2),
+    "note" TEXT,
+    "reference" TEXT NOT NULL,
+    "status" "InternalTransferStatus" NOT NULL DEFAULT 'PENDING',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP(3),
+
+    CONSTRAINT "internal_transfers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "bank_accounts" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "wiseAccountId" INTEGER NOT NULL,
-    "wiseProfileId" INTEGER NOT NULL,
+    "bankAccountId" INTEGER NOT NULL,
+    "bankProfileId" INTEGER NOT NULL,
     "currency" VARCHAR(3) NOT NULL,
     "country" VARCHAR(2) NOT NULL,
     "accountType" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "obpBankId" TEXT,
+    "obpAccountId" TEXT,
     "iban" TEXT,
     "accountNumber" TEXT,
     "sortCode" TEXT,
@@ -129,14 +148,14 @@ CREATE TABLE "wise_accounts" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "wise_accounts_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "bank_accounts_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "wise_transactions" (
+CREATE TABLE "bank_transactions" (
     "id" TEXT NOT NULL,
-    "wiseAccountId" TEXT NOT NULL,
-    "wiseTransactionId" INTEGER,
+    "bankAccountId" TEXT NOT NULL,
+    "bankTransactionId" INTEGER,
     "type" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'PENDING',
     "amount" DECIMAL(10,2) NOT NULL,
@@ -157,24 +176,7 @@ CREATE TABLE "wise_transactions" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "completedAt" TIMESTAMP(3),
 
-    CONSTRAINT "wise_transactions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "internal_transfers" (
-    "id" TEXT NOT NULL,
-    "senderId" TEXT NOT NULL,
-    "recipientId" TEXT NOT NULL,
-    "amount" DECIMAL(10,2) NOT NULL,
-    "currency" VARCHAR(3) NOT NULL,
-    "platformFee" DECIMAL(10,2),
-    "note" TEXT,
-    "reference" TEXT NOT NULL,
-    "status" "InternalTransferStatus" NOT NULL DEFAULT 'PENDING',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completedAt" TIMESTAMP(3),
-
-    CONSTRAINT "internal_transfers_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "bank_transactions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -214,10 +216,10 @@ CREATE UNIQUE INDEX "sessions_token_key" ON "sessions"("token");
 CREATE UNIQUE INDEX "transactions_referenceNumber_key" ON "transactions"("referenceNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "wise_accounts_wiseAccountId_key" ON "wise_accounts"("wiseAccountId");
+CREATE UNIQUE INDEX "internal_transfers_reference_key" ON "internal_transfers"("reference");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "internal_transfers_reference_key" ON "internal_transfers"("reference");
+CREATE UNIQUE INDEX "bank_accounts_bankAccountId_key" ON "bank_accounts"("bankAccountId");
 
 -- AddForeignKey
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -232,13 +234,13 @@ ALTER TABLE "transactions" ADD CONSTRAINT "transactions_beneficiaryId_fkey" FORE
 ALTER TABLE "beneficiaries" ADD CONSTRAINT "beneficiaries_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "wise_accounts" ADD CONSTRAINT "wise_accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "wise_transactions" ADD CONSTRAINT "wise_transactions_wiseAccountId_fkey" FOREIGN KEY ("wiseAccountId") REFERENCES "wise_accounts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "internal_transfers" ADD CONSTRAINT "internal_transfers_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "internal_transfers" ADD CONSTRAINT "internal_transfers_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bank_accounts" ADD CONSTRAINT "bank_accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bank_transactions" ADD CONSTRAINT "bank_transactions_bankAccountId_fkey" FOREIGN KEY ("bankAccountId") REFERENCES "bank_accounts"("id") ON DELETE CASCADE ON UPDATE CASCADE;

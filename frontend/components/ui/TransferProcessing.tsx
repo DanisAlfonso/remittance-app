@@ -28,25 +28,25 @@ const TransferProcessing: React.FC<TransferProcessingProps> = ({
       title: 'Initiating Transfer...', 
       description: 'Creating quote and validating recipient details',
       duration: 1500,
-      wiseStatus: 'processing'
+      bankingStatus: 'processing'
     },
     { 
       title: 'Converting Currency...', 
       description: 'Processing exchange rate',
       duration: 2000,
-      wiseStatus: 'funds_converted'
+      bankingStatus: 'funds_converted'
     },
     { 
       title: 'Sending Payment...', 
       description: 'Transfer sent to recipient bank',
       duration: 2500,
-      wiseStatus: 'outgoing_payment_sent'
+      bankingStatus: 'outgoing_payment_sent'
     },
     { 
       title: 'Transfer Complete!', 
       description: 'Money successfully delivered',
       duration: 1500,
-      wiseStatus: 'incoming_payment_sent'
+      bankingStatus: 'incoming_payment_sent'
     },
   ];
 
@@ -67,7 +67,7 @@ const TransferProcessing: React.FC<TransferProcessingProps> = ({
     ]).start();
 
     if (useRealStatusUpdates && transferId) {
-      // Use real Wise API status simulation for enhanced realism
+      // Use real OBP-API status simulation for enhanced realism
       console.log('🎯 Using real transfer status simulation');
       simulateRealTransferProgress();
     } else {
@@ -95,11 +95,11 @@ const TransferProcessing: React.FC<TransferProcessingProps> = ({
           useNativeDriver: false,
         }).start();
 
-        // Simulate real Wise status update
+        // Simulate real OBP-API status update
         if (stepIndex < steps.length - 1) {
           try {
-            await transferService.simulateTransferStatus(transferId, step.wiseStatus);
-            console.log(`✅ Status updated to: ${step.wiseStatus}`);
+            await transferService.simulateTransferStatus(transferId, step.bankingStatus);
+            console.log(`✅ Status updated to: ${step.bankingStatus}`);
           } catch (error) {
             console.warn('Status simulation failed:', error);
           }

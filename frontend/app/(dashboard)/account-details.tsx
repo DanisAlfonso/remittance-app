@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useWalletStore } from '../../lib/walletStore';
-import { wiseService } from '../../lib/wise';
+import { bankingService } from '../../lib/bankingService';
 import { transferService } from '../../lib/transfer';
 import ComprehensiveBankingDetails from '../../components/ui/ComprehensiveBankingDetails';
 import type { Transfer } from '../../types/transfer';
@@ -101,7 +101,7 @@ export default function AccountDetailsScreen() {
             <View style={styles.accountTitleSection}>
               <Text style={styles.accountNameLarge}>{selectedAccount.name}</Text>
               <Text style={styles.accountTypeLarge}>
-                {wiseService.getAccountTypeDisplayName(selectedAccount.type)}
+                {bankingService.getAccountTypeDisplayName(selectedAccount.type)}
               </Text>
             </View>
             <View style={styles.statusBadgeContainer}>
@@ -111,7 +111,7 @@ export default function AccountDetailsScreen() {
               ]}>
                 <View style={[
                   styles.statusIndicator,
-                  { backgroundColor: wiseService.getAccountStatusColor(selectedAccount.status || 'ACTIVE') }
+                  { backgroundColor: bankingService.getAccountStatusColor(selectedAccount.status || 'ACTIVE') }
                 ]} />
                 <Text style={[
                   styles.statusText,
@@ -126,7 +126,7 @@ export default function AccountDetailsScreen() {
           <View style={styles.balanceDisplay}>
             <Text style={styles.balanceLabel}>Available Balance</Text>
             <Text style={styles.balanceAmount}>
-              {wiseService.formatAmount(balance?.amount || 0, selectedAccount.currency)}
+              {bankingService.formatAmount(balance?.amount || 0, selectedAccount.currency)}
             </Text>
             <View style={styles.balanceMetadata}>
               <Ionicons name="time-outline" size={12} color="#9CA3AF" />
@@ -177,7 +177,7 @@ export default function AccountDetailsScreen() {
               <Text style={styles.infoCardLabel}>Country</Text>
               <Text style={styles.infoCardValue}>
                 {selectedAccount.iban 
-                  ? wiseService.getCountryName(wiseService.getCountryFromIban(selectedAccount.iban))
+                  ? bankingService.getCountryName(bankingService.getCountryFromIban(selectedAccount.iban))
                   : selectedAccount.country || 'N/A'}
               </Text>
             </View>

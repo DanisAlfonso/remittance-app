@@ -5,10 +5,11 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
-import { wiseService } from '../../lib/wise';
+import { bankingService } from '../../lib/bankingService';
 import { transferService } from '../../lib/transfer';
 import type { Transfer } from '../../types/transfer';
 import { apiClient } from '../../lib/api';
+import { obpService } from '../../lib/obpService';
 import ProfileCircle from '../../components/ui/ProfileCircle';
 
 
@@ -31,6 +32,7 @@ export default function DashboardScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [lastAutoRefreshTime, setLastAutoRefreshTime] = useState<Date | null>(null);
+  const [isImportingSandbox, setIsImportingSandbox] = useState(false);
 
   const loadRecentTransfers = async () => {
     if (!user || !token) {
@@ -49,7 +51,7 @@ export default function DashboardScreen() {
       // Ensure API client has the token
       apiClient.setAuthToken(token);
       
-      const response = await transferService.getTransferHistory(3, 0); // Load last 3 Wise transfers
+      const response = await transferService.getTransferHistory(3, 0); // Load last 3 OBP transaction requests
       setRecentTransfers(response.transfers);
       console.log('✅ Recent transfers loaded:', response.transfers.length, 'transfers');
     } catch (error) {
@@ -145,6 +147,51 @@ export default function DashboardScreen() {
     await refreshAllData(true); // Skip throttling for manual refresh
     setIsRefreshing(false);
   }, [refreshAllData]);
+
+  const handleImportSandboxData = async () => {
+    if (!token) {
+      Alert.alert('Error', 'You need to be logged in to import sandbox data');
+      return;
+    }
+
+    setIsImportingSandbox(true);
+    try {
+      console.log('📦 Importing sandbox data for testing...');
+      
+      // Import sandbox data with predefined accounts and balances
+      const result = await obpService.importSandboxData();
+      
+      console.log('✅ Sandbox data imported:', result);
+      
+      Alert.alert(
+        'Success!', 
+        `Sandbox data imported successfully!\n\n` +
+        `• ${result.data.total_accounts} test accounts created\n` +
+        `• ${result.data.total_transactions} transactions added\n\n` +
+        `You can now test transfers with funded accounts.`,
+        [
+          {
+            text: 'Refresh Accounts',
+            onPress: () => {
+              loadAccounts();
+              refreshAllData(true);
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('❌ Sandbox import failed:', error);
+      
+      let errorMessage = 'Failed to import sandbox data';
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = (error as { message: string }).message;
+      }
+      
+      Alert.alert('Import Failed', errorMessage);
+    } finally {
+      setIsImportingSandbox(false);
+    }
+  };
 
   const getTransferType = (transfer: Transfer): 'send' | 'receive' => {
     return transfer.sourceAmount < 0 ? 'send' : 'receive';
@@ -316,7 +363,7 @@ export default function DashboardScreen() {
             
             <View style={styles.balanceDisplay}>
               <Text style={styles.balanceAmount}>
-                {wiseService.formatAmount(balance.amount, selectedAccount.currency)}
+                {bankingService.formatAmount(balance.amount, selectedAccount.currency)}
               </Text>
               <View style={styles.balanceSubInfo}>
                 <Ionicons name="time-outline" size={12} color="#6B7280" />
@@ -345,11 +392,21 @@ export default function DashboardScreen() {
                 <Text style={styles.actionButtonText}>Send Money</Text>
               </Pressable>
               
-              <Pressable style={[styles.actionButton, styles.secondaryAction]}>
+              <Pressable 
+                style={[styles.actionButton, styles.secondaryAction]} 
+                onPress={handleImportSandboxData}
+                disabled={isImportingSandbox}
+              >
                 <View style={[styles.actionIconContainer, styles.secondaryIconContainer]}>
-                  <Ionicons name="add" size={24} color="#3B82F6" />
+                  <Ionicons 
+                    name={isImportingSandbox ? "hourglass" : "download"} 
+                    size={24} 
+                    color="#3B82F6" 
+                  />
                 </View>
-                <Text style={[styles.actionButtonText, styles.secondaryActionText]}>Add Money</Text>
+                <Text style={[styles.actionButtonText, styles.secondaryActionText]}>
+                  {isImportingSandbox ? 'Importing...' : 'Import Test Data'}
+                </Text>
               </Pressable>
               
               <Pressable style={[styles.actionButton, styles.secondaryAction]}>
@@ -386,7 +443,7 @@ export default function DashboardScreen() {
                   <View style={styles.summaryInfo}>
                     <Text style={styles.accountNameModern}>{selectedAccount.name}</Text>
                     <Text style={styles.accountTypeModern}>
-                      {wiseService.getAccountTypeDisplayName(selectedAccount.type)}
+                      {bankingService.getAccountTypeDisplayName(selectedAccount.type)}
                     </Text>
                   </View>
                 </View>
@@ -394,7 +451,7 @@ export default function DashboardScreen() {
                 <View style={styles.balanceSection}>
                   <Text style={styles.balanceLabelModern}>Available Balance</Text>
                   <Text style={styles.balanceAmountModern}>
-                    {wiseService.formatAmount(balance.amount, selectedAccount.currency)}
+                    {bankingService.formatAmount(balance.amount, selectedAccount.currency)}
                   </Text>
                   <View style={styles.balanceMetadata}>
                     <Ionicons name="time-outline" size={12} color="#9CA3AF" />
@@ -408,7 +465,7 @@ export default function DashboardScreen() {
                   <View style={styles.ibanContainer}>
                     <Text style={styles.ibanLabel}>IBAN</Text>
                     <Text style={styles.ibanValueModern}>
-                      {wiseService.formatIban(selectedAccount.iban)}
+                      {bankingService.formatIban(selectedAccount.iban)}
                     </Text>
                   </View>
                 )}

@@ -123,6 +123,78 @@ class ApiClient {
     });
   }
 
+  // OBP-API specific request method (bypasses /api/v1 prefix)
+  private async obpRequest<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = `${this.baseURL}${endpoint}`; // Direct URL without /api/v1 prefix
+    
+    const headers = {
+      ...this.defaultHeaders,
+      ...options.headers,
+    };
+
+    // Create AbortController for timeout
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, 30000); // 30 second timeout
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: abortController.signal,
+      });
+
+      clearTimeout(timeoutId);
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw {
+            error: 'Network timeout',
+            message: 'Request timed out. Please check your connection.',
+            statusCode: 408,
+          } as ApiError;
+        }
+        
+        if (error.message === 'Network request failed') {
+          throw {
+            error: 'Network error',
+            message: 'Unable to connect to server. Please check your internet connection.',
+            statusCode: 0,
+          } as ApiError;
+        }
+      }
+      
+      throw error;
+    }
+  }
+
+  // OBP-API specific methods
+  async obpGet<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    return this.obpRequest<T>(endpoint, {
+      ...options,
+      method: 'GET',
+    });
+  }
+
+  async obpPost<T>(
+    endpoint: string,
+    data?: unknown,
+    options: RequestInit = {}
+  ): Promise<T> {
+    return this.obpRequest<T>(endpoint, {
+      ...options,
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
   // Set authorization header for authenticated requests
   setAuthToken(token: string | null) {
     if (token) {

@@ -5,7 +5,7 @@ import morgan from 'morgan';
 import { env } from './config/environment';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth';
-import wiseRoutes from './routes/wise';
+import bankingRoutes from './routes/banking';
 import transferRoutes from './routes/transfer';
 import usersRoutes from './routes/users';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -39,7 +39,7 @@ app.get('/api/v1/health', (req, res) => {
 });
 
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/wise', wiseRoutes);
+app.use('/api/v1/wise', bankingRoutes);
 app.use('/api/v1/transfer', transferRoutes);
 app.use('/api/v1/users', usersRoutes);
 

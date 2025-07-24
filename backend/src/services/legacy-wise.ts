@@ -1,13 +1,13 @@
 import { env } from '../config/environment';
 import type {
-  WiseConfig,
-  WiseTokenResponse,
-  WiseAccount,
-  WiseError,
-  WiseApiResponse,
-  CreateWiseAccountRequest,
-  WiseAccountDetails,
-} from '../types/wise';
+  BankingConfig as WiseConfig,
+  BankingTokenResponse as WiseTokenResponse,
+  BankAccount as WiseAccount,
+  BankingError as WiseError,
+  BankingApiResponse as WiseApiResponse,
+  CreateBankAccountRequest as CreateWiseAccountRequest,
+  BankAccountDetails as WiseAccountDetails,
+} from '../types/banking';
 
 // New types for real Wise Platform API
 interface WiseUserProfile {

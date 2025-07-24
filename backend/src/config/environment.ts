@@ -13,10 +13,16 @@ interface EnvironmentConfig {
   RATE_LIMIT_WINDOW_MS: number;
   RATE_LIMIT_MAX_REQUESTS: number;
   WISE_BASE_URL: string;
-  WISE_CLIENT_ID: string;
+  WISE_CLIENT_ID: string;  
   WISE_CLIENT_SECRET: string;
   WISE_REDIRECT_URI: string;
   WISE_WEBHOOK_SECRET: string;
+  // OBP-API configuration
+  OBP_API_BASE_URL: string;
+  OBP_CONSUMER_KEY: string;
+  OBP_CONSUMER_SECRET: string;
+  OBP_USERNAME: string;
+  OBP_PASSWORD: string;
 }
 
 const requiredEnvVars = [
@@ -46,6 +52,12 @@ function validateEnvironment(): EnvironmentConfig {
     WISE_CLIENT_SECRET: process.env.WISE_CLIENT_SECRET || 'sandbox-client-secret',
     WISE_REDIRECT_URI: process.env.WISE_REDIRECT_URI || 'my-app://callback',
     WISE_WEBHOOK_SECRET: process.env.WISE_WEBHOOK_SECRET || 'sandbox-webhook-secret',
+    // OBP-API defaults (using the values from our successful OBP-API setup)
+    OBP_API_BASE_URL: process.env.OBP_API_BASE_URL || 'http://127.0.0.1:8080',
+    OBP_CONSUMER_KEY: process.env.OBP_CONSUMER_KEY || 'vttcad5o5fas3tmuifj5stclbuei4letdtstk4zu',
+    OBP_CONSUMER_SECRET: process.env.OBP_CONSUMER_SECRET || 'i1a1qsi0sy3lux4xjhmfg4n1y1besylzvvplkl0x',
+    OBP_USERNAME: process.env.OBP_USERNAME || 'bootstrap',
+    OBP_PASSWORD: process.env.OBP_PASSWORD || 'BootstrapPass123!',
   };
 }
 

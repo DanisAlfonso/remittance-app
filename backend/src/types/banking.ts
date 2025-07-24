@@ -1,11 +1,11 @@
-export interface WiseConfig {
+export interface BankingConfig {
   baseUrl: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
 }
 
-export interface WiseTokenResponse {
+export interface BankingTokenResponse {
   access_token: string;
   refresh_token: string;
   token_type: string;
@@ -13,7 +13,7 @@ export interface WiseTokenResponse {
   scope: string;
 }
 
-export interface WiseProfile {
+export interface BankingProfile {
   id: number;
   type: string;
   name: string;
@@ -24,7 +24,7 @@ export interface WiseProfile {
   updated_at: string;
 }
 
-export interface WiseAccount {
+export interface BankAccount {
   id: number;
   profile: number;
   currency: string;
@@ -41,9 +41,12 @@ export interface WiseAccount {
   iban?: string;
   account_number?: string;
   sort_code?: string;
+  // OBP-API integration fields
+  obp_bank_id?: string;
+  obp_account_id?: string;
 }
 
-export interface WiseBalance {
+export interface BankBalance {
   id: number;
   currency: string;
   amount: number;
@@ -53,7 +56,7 @@ export interface WiseBalance {
   updated_at: string;
 }
 
-export interface WiseWebhookEvent {
+export interface BankingWebhookEvent {
   id: string;
   type: string;
   created_at: string;
@@ -70,7 +73,7 @@ export interface WiseWebhookEvent {
   };
 }
 
-export interface WiseError {
+export interface BankingError {
   error: string;
   error_description?: string;
   error_code?: string;
@@ -83,14 +86,14 @@ export interface WiseError {
   }>;
 }
 
-export interface WiseApiResponse<T> {
+export interface BankingApiResponse<T> {
   success: boolean;
   data?: T;
-  error?: WiseError;
+  error?: BankingError;
   statusCode: number;
 }
 
-export interface CreateWiseAccountRequest {
+export interface CreateBankAccountRequest {
   userId: string;
   currency: string;
   country: string;
@@ -98,7 +101,7 @@ export interface CreateWiseAccountRequest {
   name: string;
 }
 
-export interface WiseAccountDetails {
+export interface BankAccountDetails {
   id: number;
   currency: string;
   country: string;

@@ -1,7 +1,7 @@
 import { Router, Response, RequestHandler } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/database';
-import { wiseService } from '../services/wise';
+import { obpApiService } from '../services/obp-api';
 import { transferService } from '../services/transfer';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
@@ -18,100 +18,15 @@ const createAccountSchema = z.object({
   name: z.string().min(1, 'Account name is required').max(100),
 });
 
-const authCallbackSchema = z.object({
-  code: z.string().min(1, 'Authorization code is required'),
-  state: z.string().min(1, 'State parameter is required'),
-});
+// OAuth schema removed - using direct OBP-API integration
 
 const updateBalanceSchema = z.object({
   amount: z.number().min(0, 'Amount must be positive'),
 });
 
-/**
- * GET /api/v1/wise/auth/url
- * Generate OAuth authorization URL for Wise account linking
- */
-const getAuthUrlHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const state = `${userId}-${Date.now()}`;
-    
-    const authUrl = wiseService.generateAuthorizationUrl(state);
-    
-    res.json({
-      message: 'Authorization URL generated successfully',
-      authUrl,
-      state,
-    });
-  } catch (error) {
-    console.error('Auth URL generation error:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to generate authorization URL',
-    });
-  }
-};
+// OAuth functionality removed - using direct OBP-API integration
 
-/**
- * POST /api/v1/wise/auth/callback
- * Handle OAuth callback and exchange code for tokens
- */
-const authCallbackHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
-  try {
-    const validatedData = authCallbackSchema.parse(req.body);
-    
-    // Exchange code for token
-    const tokenResult = await wiseService.exchangeCodeForToken(validatedData.code);
-    
-    if (!tokenResult.success) {
-      res.status(400).json({
-        error: 'OAuth exchange failed',
-        message: tokenResult.error?.error_description || 'Failed to exchange authorization code',
-      });
-      return;
-    }
-    
-    // Get user profiles (we'll use the first one for simplicity)
-    const profilesResult = await wiseService.getProfiles();
-    
-    if (!profilesResult.success || !profilesResult.data || profilesResult.data.length === 0) {
-      res.status(400).json({
-        error: 'Profile retrieval failed',
-        message: 'No profiles found for this account',
-      });
-      return;
-    }
-    
-    const profile = profilesResult.data[0];
-    
-    res.json({
-      message: 'OAuth authentication successful',
-      profile: profile,
-      tokenData: {
-        expiresIn: tokenResult.data?.expires_in,
-        scope: tokenResult.data?.scope,
-      },
-    });
-  } catch (error) {
-    console.error('Auth callback error:', error);
-    
-    if (error instanceof z.ZodError) {
-      res.status(400).json({
-        error: 'Validation error',
-        details: error.errors.map(e => ({
-          field: e.path.join('.'),
-          message: e.message,
-        })),
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to process OAuth callback',
-    });
-  }
-};
+// OAuth callback functionality removed - using direct OBP-API integration
 
 /**
  * POST /api/v1/wise/accounts
@@ -147,8 +62,9 @@ const createAccountHandler: RequestHandler = async (req: AuthRequest, res: Respo
       return;
     }
 
-    // Create account through Wise API with real profile creation
-    const createResult = await wiseService.createAccount({
+    // Create account through OBP-API
+    console.log('🏦 Creating account via OBP-API...');
+    const createResult = await obpApiService.createAccount({
       userId,
       currency: validatedData.currency,
       country: validatedData.country,
@@ -166,8 +82,21 @@ const createAccountHandler: RequestHandler = async (req: AuthRequest, res: Respo
     
     const wiseAccount = createResult.data!;
     
-    // Get account details including IBAN
-    const detailsResult = await wiseService.getAccountDetails(wiseAccount.profile, wiseAccount.id);
+    // Get account details including IBAN from OBP-API (optional - fallback if fails)
+    console.log('🔍 Getting OBP account details...');
+    console.log('🔍 Using OBP bank ID:', wiseAccount.obp_bank_id);
+    console.log('🔍 Using OBP account ID:', wiseAccount.obp_account_id);
+    let detailsResult: any = { success: false, data: null };
+    try {
+      if (wiseAccount.obp_bank_id && wiseAccount.obp_account_id) {
+        detailsResult = await obpApiService.getAccountDetails(wiseAccount.obp_bank_id, wiseAccount.obp_account_id);
+        console.log('✅ Successfully retrieved account details with BIC:', detailsResult.data?.bic);
+      } else {
+        console.log('⚠️ Missing OBP bank ID or account ID, skipping account details retrieval');
+      }
+    } catch (error) {
+      console.log('⚠️ Could not get account details, using data from account creation:', error);
+    }
     
     // Store account in database
     const savedAccount = await prisma.wiseAccount.create({
@@ -175,6 +104,8 @@ const createAccountHandler: RequestHandler = async (req: AuthRequest, res: Respo
         userId,
         wiseAccountId: wiseAccount.id,
         wiseProfileId: wiseAccount.profile,
+        obpBankId: wiseAccount.obp_bank_id,
+        obpAccountId: wiseAccount.obp_account_id,
         currency: validatedData.currency,
         country: validatedData.country,
         accountType: validatedData.type,
@@ -184,9 +115,9 @@ const createAccountHandler: RequestHandler = async (req: AuthRequest, res: Respo
         accountNumber: wiseAccount.account_number || detailsResult.data?.account_number,
         sortCode: wiseAccount.sort_code || detailsResult.data?.sort_code,
         routingNumber: detailsResult.data?.routing_number,
-        bic: detailsResult.data?.bic,
-        bankName: detailsResult.data?.bank_name,
-        bankAddress: detailsResult.data?.bank_address,
+        bic: detailsResult.data?.bic || 'ENHBK1XXXX', // Default to Enhanced Bank BIC
+        bankName: detailsResult.data?.bank_name || 'Enhanced Test Bank Limited',
+        bankAddress: detailsResult.data?.bank_address || 'Enhanced Bank Location',
         lastBalance: wiseAccount.balance.amount,
         balanceUpdatedAt: new Date(),
       },
@@ -212,7 +143,7 @@ const createAccountHandler: RequestHandler = async (req: AuthRequest, res: Respo
       },
     });
   } catch (error) {
-    console.error('Account creation error:', error);
+    console.error('❌ Account creation error:', error);
     
     if (error instanceof z.ZodError) {
       res.status(400).json({
@@ -225,9 +156,14 @@ const createAccountHandler: RequestHandler = async (req: AuthRequest, res: Respo
       return;
     }
     
+    // Show the actual OBP error for debugging
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('❌ Real error message:', errorMessage);
+    
     res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to create Wise account',
+      error: 'OBP Account Creation Failed',
+      message: errorMessage,
+      details: error instanceof Error ? error.stack : undefined,
     });
   }
 };
@@ -355,47 +291,42 @@ const getAccountBalanceHandler: RequestHandler = async (req: AuthRequest, res: R
       return;
     }
     
-    // In sandbox mode, prioritize our cached balance over API balance
-    // because transfers are simulated locally and not reflected in Wise sandbox
+    // Get balance from REAL OBP-API only
+    console.log('💰 Getting REAL OBP balance for account:', account.obpAccountId);
     
-    // Try to get fresh balance from Wise API, but don't overwrite our local balance
-    const balanceResult = await wiseService.getAccountBalance(account.wiseProfileId, account.currency);
-    
-    if (!balanceResult.success || process.env.NODE_ENV === 'development') {
-      // Return cached balance for sandbox/development mode
-      res.json({
-        message: 'Balance retrieved from cache',
-        balance: {
-          amount: account.lastBalance,
-          currency: account.currency,
-          updatedAt: account.balanceUpdatedAt,
-          cached: true,
-        },
-      });
-      return;
+    try {
+      const balanceResult = await obpApiService.getAccountBalance(account.obpAccountId || account.id, account.currency);
+      
+      if (balanceResult.success && balanceResult.data) {
+        // Use real OBP balance
+        const balance = balanceResult.data;
+        
+        res.json({
+          message: 'Real OBP balance retrieved successfully',
+          balance: {
+            amount: balance.availableAmount.value,
+            currency: balance.currency,
+            reservedAmount: balance.reservedAmount.value,
+            totalAmount: balance.amount.value,
+            updatedAt: new Date(),
+            cached: false,
+          },
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('❌ Real OBP balance retrieval failed:', error);
     }
     
-    // Only in production: sync with real Wise API
-    const balances = Array.isArray(balanceResult.data) ? balanceResult.data : [balanceResult.data];
-    const balance = balances.find(b => b.currency === account.currency);
-    
-    if (!balance) {
-      res.status(404).json({
-        error: 'Balance not found',
-        message: 'Balance for this currency not found',
-      });
-      return;
-    }
-    
+    // If OBP fails, return the stored balance (but mark it clearly as cached)
+    console.log('📦 Using stored balance as fallback');
     res.json({
-      message: 'Balance retrieved successfully',
+      message: 'Balance retrieved from database (OBP unavailable)',
       balance: {
-        amount: balance.availableAmount.value,
-        currency: balance.currency,
-        reservedAmount: balance.reservedAmount.value,
-        totalAmount: balance.amount.value,
-        updatedAt: new Date(),
-        cached: false,
+        amount: parseFloat(account.lastBalance || '0'),
+        currency: account.currency,
+        updatedAt: account.balanceUpdatedAt,
+        cached: true,
       },
     });
   } catch (error) {
@@ -674,21 +605,84 @@ const getTransferHistoryHandler: RequestHandler = async (req: AuthRequest, res: 
 
 /**
  * GET /api/v1/wise/test-connectivity
- * Test real API connectivity and show available features
+ * Test OBP-API connectivity and show available features
  */
 const testConnectivityHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const result = await wiseService.testRealApiConnectivity();
+    const obpResult = await obpApiService.testConnectivity();
     
     res.json({
-      message: 'API connectivity test completed',
-      ...result,
+      message: 'OBP-API connectivity test completed',
+      obpApi: obpResult,
     });
   } catch (error) {
     console.error('Connectivity test error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to test API connectivity',
+      message: 'Failed to test OBP-API connectivity',
+    });
+  }
+};
+
+/**
+ * GET /api/v1/wise/test-obp-account/:bankId/:accountId
+ * Test OBP account details retrieval directly
+ */
+const testObpAccountHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const { bankId, accountId } = req.params;
+    
+    console.log(`🔍 Testing OBP account details for ${bankId}/${accountId}`);
+    
+    const detailsResult = await obpApiService.getAccountDetails(bankId, accountId);
+    
+    res.json({
+      message: 'OBP account details test completed',
+      bankId,
+      accountId,
+      result: detailsResult,
+    });
+  } catch (error) {
+    console.error('OBP account test error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Failed to test OBP account details',
+    });
+  }
+};
+
+/**
+ * GET /api/v1/wise/list-obp-accounts
+ * List all OBP accounts for current user
+ */
+const listObpAccountsHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    console.log('📋 Listing all OBP accounts for current user');
+    
+    const result = await obpApiService.makeRequest<{ accounts: Array<{ 
+      id: string; 
+      bank_id: string; 
+      label: string; 
+      account_routings?: Array<{ scheme: string; address: string }>;
+      balance: { currency: string; amount: string };
+    }> }>('/obp/v4.0.0/my/accounts');
+    
+    if (result.success && result.data) {
+      res.json({
+        message: 'OBP accounts listed successfully',
+        accounts: result.data.accounts,
+      });
+    } else {
+      res.status(500).json({
+        error: 'Failed to list OBP accounts',
+        message: result.error?.error_description || 'Unknown error',
+      });
+    }
+  } catch (error) {
+    console.error('List OBP accounts error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Failed to list OBP accounts',
     });
   }
 };
@@ -794,15 +788,8 @@ const simulateTransferStatusHandler: RequestHandler = async (req: AuthRequest, r
       }
     }
 
-    // Try to simulate with real Wise API if available
-    try {
-      const transferIdNumber = parseInt(id.replace(/\D/g, '').slice(-8));
-      if (transferIdNumber) {
-        await wiseService.simulateTransferStatus(transferIdNumber, status);
-      }
-    } catch (apiError) {
-      console.warn('Real API simulation failed:', apiError);
-    }
+    // For OBP-API, we handle status updates directly in the database
+    console.log('📊 OBP-API transfer status updated directly in database');
 
     res.json({
       message: 'Transfer status updated successfully',
@@ -822,8 +809,9 @@ const simulateTransferStatusHandler: RequestHandler = async (req: AuthRequest, r
 
 // Register routes
 router.get('/test-connectivity', testConnectivityHandler);
-router.get('/auth/url', getAuthUrlHandler);
-router.post('/auth/callback', authCallbackHandler);
+router.get('/test-obp-account/:bankId/:accountId', testObpAccountHandler);
+router.get('/list-obp-accounts', listObpAccountsHandler);
+// OAuth routes removed - using direct OBP-API integration
 router.get('/balance', getBalanceHandler);
 router.post('/accounts', createAccountHandler);
 router.get('/accounts', getAccountsHandler);

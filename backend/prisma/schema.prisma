@@ -185,6 +185,10 @@ model WiseAccount {
   name          String
   status        String   @default("ACTIVE")
   
+  // OBP-API integration fields  
+  obpBankId     String?  // OBP bank ID (e.g., "TESTBANK1")
+  obpAccountId  String?  // OBP account ID for real banking integration
+  
   // Account identifiers
   iban          String?
   accountNumber String?

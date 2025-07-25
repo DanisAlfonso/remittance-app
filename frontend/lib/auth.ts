@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         set({ isLoading: true, error: null });
         
         try {
-          const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
+          const response = await apiClient.post<AuthResponse>('/users/current/logins/direct', credentials);
           
           // Check if this is a different user than previously stored
           const storedUserString = await SecureStore.getItemAsync(USER_KEY);
@@ -97,7 +97,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         set({ isLoading: true, error: null });
         
         try {
-          const response = await apiClient.post<AuthResponse>('/auth/register', userData);
+          const response = await apiClient.post<AuthResponse>('/users', userData);
 
           // Clear any existing wallet data for new registration
           await SecureStore.deleteItemAsync('wallet-storage');
@@ -194,7 +194,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           }
 
           // Call a protected endpoint to validate token
-          await apiClient.get('/auth/validate', {
+          await apiClient.get('/users/current', {
             headers: { Authorization: `Bearer ${token}` }
           });
           

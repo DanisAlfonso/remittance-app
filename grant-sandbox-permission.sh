@@ -6,9 +6,9 @@
 echo "🔑 Granting CanCreateSandbox permission to bootstrap user..."
 echo "============================================================="
 
-# Your OBP-API credentials
-CONSUMER_KEY="vttcad5o5fas3tmuifj5stclbuei4letdtstk4zu"
-CONSUMER_SECRET="i1a1qsi0sy3lux4xjhmfg4n1y1besylzvvplkl0x"
+# Your OBP-API credentials (updated after database reset)
+CONSUMER_KEY="fi4or5r0obmq5mwj2ywpqe52xrazlvxd2myx3y4m"
+CONSUMER_SECRET="ybukbktzvc1lpokpbpetjynnemkq4u1e3edop1rw"
 USERNAME="bootstrap"
 PASSWORD="BootstrapPass123!"
 API_URL="http://127.0.0.1:8080"
@@ -75,18 +75,29 @@ except:
             echo "⚠️  Role might already exist or there was an issue"
         fi
         
-        echo -e "\n🎯 Step 5: Also granting CanCreateSandboxDataImport role..."
-        IMPORT_ENTITLEMENT_RESPONSE=$(curl -s -X POST "$API_URL/obp/v5.1.0/users/$USER_ID/entitlements" \
+        echo -e "\n🎯 Step 5: Granting CanCreateBank role..."
+        BANK_ENTITLEMENT_RESPONSE=$(curl -s -X POST "$API_URL/obp/v5.1.0/users/$USER_ID/entitlements" \
           -H "Content-Type: application/json" \
           -H "Authorization: DirectLogin username=\"$USERNAME\",password=\"$PASSWORD\",consumer_key=\"$CONSUMER_KEY\",token=\"$TOKEN\"" \
           -d '{
-            "role_name": "CanCreateSandboxDataImport",
+            "role_name": "CanCreateBank",
             "bank_id": ""
           }')
         
-        echo "Import Entitlement Response: $IMPORT_ENTITLEMENT_RESPONSE"
+        echo "Bank Entitlement Response: $BANK_ENTITLEMENT_RESPONSE"
         
-        echo -e "\n🔍 Step 6: Verifying current entitlements..."
+        echo -e "\n🎯 Step 6: Granting CanCreateAccount role for any bank..."
+        ACCOUNT_ENTITLEMENT_RESPONSE=$(curl -s -X POST "$API_URL/obp/v5.1.0/users/$USER_ID/entitlements" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: DirectLogin username=\"$USERNAME\",password=\"$PASSWORD\",consumer_key=\"$CONSUMER_KEY\",token=\"$TOKEN\"" \
+          -d '{
+            "role_name": "CanCreateAccount",
+            "bank_id": ""
+          }')
+        
+        echo "Account Entitlement Response: $ACCOUNT_ENTITLEMENT_RESPONSE"
+        
+        echo -e "\n🔍 Step 7: Verifying current entitlements..."
         ENTITLEMENTS_RESPONSE=$(curl -s -X GET "$API_URL/obp/v5.1.0/users/$USER_ID/entitlements" \
           -H "Authorization: DirectLogin username=\"$USERNAME\",password=\"$PASSWORD\",consumer_key=\"$CONSUMER_KEY\",token=\"$TOKEN\"")
         

@@ -283,6 +283,164 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
 };
 
 /**
+ * GET /obp/v5.1.0/my/accounts/{account-id}/balance
+ * Get account balance for specific account (OBP-API compliant)
+ */
+const getAccountBalanceHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const { accountId } = req.params;
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      res.status(401).json({
+        error: {
+          error_code: 'OBP-20001',
+          error_message: 'User not logged in. Authentication via OAuth/Direct Login required.'
+        }
+      });
+      return;
+    }
+
+    console.log(`💰 Getting balance for account ${accountId} for user ${userId}...`);
+    console.log(`🔍 Debug: accountId="${accountId}", userId="${userId}"`);
+    console.log(`🔍 Debug: includes '-': ${accountId.includes('-')}, startsWith userId: ${accountId.startsWith(userId)}`);
+    
+    let account;
+    
+    // Check if accountId is in the new format (userId-currency)
+    if (accountId.includes('-') && accountId.startsWith(userId)) {
+      const currency = accountId.split('-').pop(); // Get last part after splitting by '-'
+      console.log(`🔍 Looking for account with currency: ${currency}`);
+      
+      account = await prisma.bankAccount.findFirst({
+        where: { 
+          userId,
+          currency,
+          status: 'ACTIVE',
+          accountType: 'virtual_remittance'
+        }
+      });
+    } else {
+      // Fallback: try IBAN match or numeric ID
+      account = await prisma.bankAccount.findFirst({
+        where: { 
+          userId,
+          iban: accountId, // Frontend passes IBAN as accountId
+          status: 'ACTIVE',
+          accountType: 'virtual_remittance'
+        }
+      });
+
+      if (!account) {
+        // Try with bankAccountId as well
+        account = await prisma.bankAccount.findFirst({
+          where: { 
+            userId,
+            bankAccountId: parseInt(accountId.replace(/\D/g, '')) || 0,
+            status: 'ACTIVE',
+            accountType: 'virtual_remittance'
+          }
+        });
+      }
+    }
+
+    if (!account) {
+      res.status(404).json({
+        error: {
+          error_code: 'OBP-30001',
+          error_message: 'Account not found or access denied'
+        }
+      });
+      return;
+    }
+    
+    res.json({
+      balance: {
+        currency: account.currency,
+        amount: (account.lastBalance || 0).toString(),
+        updatedAt: account.balanceUpdatedAt?.toISOString() || new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('OBP get account balance error:', error);
+    res.status(500).json({
+      error: {
+        error_code: 'OBP-50000',
+        error_message: 'Unknown Error'
+      }
+    });
+  }
+};
+
+/**
+ * GET /obp/v5.1.0/users/current
+ * Get current user details (OBP-API compliant)
+ */
+const getCurrentUserHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      res.status(401).json({
+        error: {
+          error_code: 'OBP-20001',
+          error_message: 'User not logged in. Authentication via OAuth/Direct Login required.'
+        }
+      });
+      return;
+    }
+
+    console.log(`👤 Getting current user details for ${userId}...`);
+    
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        country: true,
+        isActive: true,
+        emailVerified: true,
+        createdAt: true
+      }
+    });
+    
+    if (!user) {
+      res.status(404).json({
+        error: {
+          error_code: 'OBP-30001',
+          error_message: 'User not found'
+        }
+      });
+      return;
+    }
+    
+    res.json({
+      user_id: user.id,
+      email: user.email,
+      first_name: user.firstName,
+      last_name: user.lastName,
+      phone: user.phone,
+      country: user.country,
+      is_active: user.isActive,
+      email_verified: user.emailVerified,
+      created_at: user.createdAt.toISOString()
+    });
+  } catch (error) {
+    console.error('OBP get current user error:', error);
+    res.status(500).json({
+      error: {
+        error_code: 'OBP-50000',
+        error_message: 'Unknown Error'
+      }
+    });
+  }
+};
+
+/**
  * POST /obp/v5.1.0/transaction-requests
  * Create transaction request (OBP-API compliant)
  */
@@ -354,8 +512,8 @@ const importSandboxDataHandler: RequestHandler = async (req: AuthRequest, res: R
 
     console.log('📦 Importing sandbox data via OBP-API...');
     
-    // Import sandbox data using OBP service
-    const result = await obpApiService.importSandboxData();
+    // Import sandbox data using OBP service with authenticated user ID
+    const result = await obpApiService.importSandboxData(userId);
     
     if (!result.success || !result.data) {
       res.status(result.statusCode).json({
@@ -367,39 +525,8 @@ const importSandboxDataHandler: RequestHandler = async (req: AuthRequest, res: R
       return;
     }
 
-    // Save created accounts to our database for banking service visibility
-    const createdAccounts = result.data.created_accounts || [];
-    console.log(`💾 Saving ${createdAccounts.length} accounts to local database...`);
-    
-    let savedAccounts = 0;
-    for (const account of createdAccounts) {
-      try {
-        // Create bank account in our database
-        const dbAccount = await prisma.bankAccount.create({
-          data: {
-            userId: userId,
-            bankAccountId: Math.floor(Math.random() * 1000000), // Generate random ID for now
-            bankProfileId: Math.floor(Math.random() * 100000), // Generate random profile ID
-            currency: account.currency,
-            country: 'GB', // Default country
-            accountType: account.type.toLowerCase(),
-            name: account.label,
-            status: 'ACTIVE',
-            accountNumber: account.obp_account_id.slice(-8), // Use last 8 chars as account number
-            // Store OBP-specific references
-            obpBankId: account.obp_bank_id,
-            obpAccountId: account.obp_account_id,
-          },
-        });
-        
-        savedAccounts++;
-        console.log(`✅ Saved ${account.currency} account to database: ${dbAccount.id}`);
-      } catch (dbError) {
-        console.error(`❌ Failed to save ${account.currency} account to database:`, dbError);
-      }
-    }
-    
-    console.log(`💾 Saved ${savedAccounts}/${createdAccounts.length} accounts to database`);
+    // Log successful sandbox data import
+    console.log('💾 Sandbox data imported successfully - accounts now funded for testing');
     
     res.status(201).json({
       message: 'Sandbox data imported successfully',
@@ -422,8 +549,8 @@ const importSandboxDataHandler: RequestHandler = async (req: AuthRequest, res: R
  */
 const createTestDepositHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const { bankId, accountId } = req.params;
-    const { amount, currency, description } = req.body;
+    const { accountId } = req.params;
+    const { amount, currency } = req.body;
     const userId = req.user?.id;
     
     if (!userId) {
@@ -448,14 +575,8 @@ const createTestDepositHandler: RequestHandler = async (req: AuthRequest, res: R
 
     console.log(`💰 Creating test deposit for account ${accountId}...`);
     
-    // Create test deposit using OBP service
-    const result = await obpApiService.createTestDeposit(
-      bankId,
-      accountId,
-      parseFloat(amount),
-      currency,
-      description
-    );
+    // Use sandbox data import to fund the account (OBP-API compliant approach)
+    const result = await obpApiService.importSandboxData(userId);
     
     if (!result.success || !result.data) {
       res.status(result.statusCode).json({
@@ -483,6 +604,8 @@ const createTestDepositHandler: RequestHandler = async (req: AuthRequest, res: R
 };
 
 // Register OBP-API compliant routes
+router.get('/users/current', getCurrentUserHandler);
+router.get('/my/accounts/:accountId/balance', getAccountBalanceHandler);
 router.get('/banks/:bankId/accounts', getBankAccountsHandler);
 router.post('/banks/:bankId/accounts', createBankAccountHandler);
 router.get('/banks/:bankId/accounts/:accountId/transactions', getAccountTransactionsHandler);

@@ -1,34 +1,39 @@
 # Fintech Remittance App - Claude Documentation
 
-## ✅ **100% REAL OBP-API INTEGRATION COMPLETE**
+## 🚨 **CRITICAL DEVELOPMENT PRINCIPLES** 🚨
 
-**NO MOCK DATA - 100% REAL OBP-API INTEGRATION ACHIEVED**
+### **NEVER LIE - NEVER MAKE THINGS UP**
+- **Research First**: Always research from correct, authoritative sources when implementing unknown functionality
+- **Honest Assessment**: Never claim something is "real", "production-grade", or "properly implemented" without verification
+- **OBP-API Compliance**: Strictly follow official OBP-API documentation and standards for all banking integrations
+- **Admit Limitations**: Clearly state when something is simulated, prototype, or incomplete
+- **Verify Claims**: Double-check all technical statements against actual implementation and standards
 
-**Final Status**: 
-- ✅ **OBP-API Authentication**: DirectLogin working perfectly (password escaping fixed)
-- ✅ **Real Account Creation**: Uses actual OBP-API POST `/obp/v4.0.0/banks/TESTBANK1/accounts` endpoint
-- ✅ **Real Balance Retrieval**: Uses actual OBP-API `/obp/v4.0.0/my/accounts` endpoint
-- ✅ **Real Account Details**: Uses actual OBP-API account detail endpoints
-- ✅ **No Fallbacks**: All mock/fallback logic completely removed - only real OBP-API calls
-- ✅ **Error Handling**: If OBP-API fails, system throws errors (no silent fallbacks)
+## 🚧 **OBP-API INTEGRATION STATUS: PARTIAL IMPLEMENTATION**
 
-**Proven Working**: Successfully created real OBP account:
-```json
-{
-  "account_id": "b11d36ef-d873-47f4-b893-48c9abc96165",
-  "user_id": "4b860dd9-7ef8-468c-8e93-c21824055618",
-  "label": "Real OBP EUR Account", 
-  "product_code": "EUR_CURRENT",
-  "balance": {"currency": "EUR", "amount": "0.00"},
-  "account_routings": [{"scheme": "IBAN", "address": "ES8321000418450012345678"}]
-}
-```
+**Current Status: DEVELOPMENT PROTOTYPE WITH SIMULATED BANKING**
 
-**Technical Implementation**: 
-- Uses bootstrap user with `CanCreateAccount` role for TESTBANK1
-- Proper OBP-API JSON format with zero initial balance requirement
-- Real IBAN generation and account routing
-- Complete removal of all `createMockOBPAccount()` and fallback methods
+### **What's Actually Implemented:**
+- ✅ **Database Integration**: PostgreSQL with proper banking schema and atomic transactions
+- ✅ **Authentication System**: JWT-based authentication with secure token management
+- ✅ **Virtual Account Architecture**: Master account banking simulation with proper IBAN generation
+- ✅ **Spanish IBAN Compliance**: Correctly formatted 24-character Spanish IBANs following ISO standards
+- ✅ **Banking Details UI**: Complete banking information display (IBAN, BIC, bank name, address)
+- ✅ **Transaction Tracking**: Database transaction history and audit trails
+- ✅ **Financial Safety**: Atomic transactions, negative balance prevention, backup systems
+
+### **What's NOT Implemented (Still TODO):**
+- ❌ **Real OBP-API Integration**: Currently simulated - not connected to actual Open Bank Project APIs
+- ❌ **Real Money Movement**: No actual banking partner integration for fund transfers
+- ❌ **Production Banking Compliance**: Missing regulatory compliance for real financial operations
+- ❌ **Real Account Creation**: Virtual accounts in database only, not registered with banking partners
+- ❌ **Live Balance Updates**: Balance tracking is database-only, not connected to real accounts
+- ❌ **External Bank Integration**: No SEPA, SWIFT, or correspondent banking integrations
+- ❌ **KYC/AML Integration**: Missing identity verification and anti-money laundering systems
+- ❌ **Real-time Exchange Rates**: No live currency conversion or FX rate feeds
+
+### **Development Architecture:**
+This is a **high-quality financial software prototype** with production-grade code structure, but it operates entirely with simulated banking data. The system demonstrates proper fintech architecture patterns while safely avoiding real money movement during development.
 
 ## Project Overview
 A secure, modern fintech remittance application built with React Native (Expo) and Node.js/Express. This app enables users to send money internationally with robust security features and compliance with financial regulations.

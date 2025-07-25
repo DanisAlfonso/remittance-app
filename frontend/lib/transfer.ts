@@ -18,7 +18,7 @@ export class TransferService {
     sourceCurrency: string,
     type: 'BALANCE_PAYOUT' | 'BANK_TRANSFER' = 'BANK_TRANSFER'
   ): Promise<{ quote: TransferQuote }> {
-    const response = await apiClient.post<{ quote: TransferQuote }>('/transfer/quote', {
+    const response = await apiClient.post<{ quote: TransferQuote }>('/transaction-requests/quote', {
       sourceAccountId,
       targetCurrency,
       targetCountry,
@@ -33,7 +33,7 @@ export class TransferService {
    * Create a transfer
    */
   async createTransfer(request: CreateTransferRequest): Promise<{ transfer: Transfer }> {
-    const response = await apiClient.post<{ transfer: Transfer }>('/transfer/create', request);
+    const response = await apiClient.post<{ transfer: Transfer }>('/transaction-requests', request);
     return response;
   }
 
@@ -66,7 +66,7 @@ export class TransferService {
    * Get transfer by ID
    */
   async getTransfer(transferId: string): Promise<{ transfer: Transfer }> {
-    const response = await apiClient.get<{ transfer: Transfer }>(`/transfer/${transferId}`);
+    const response = await apiClient.get<{ transfer: Transfer }>(`/transaction-requests/${transferId}`);
     return response;
   }
 
@@ -108,7 +108,7 @@ export class TransferService {
    * Get exchange rate for currency pair
    */
   async getExchangeRate(source: string, target: string): Promise<{ rate: ExchangeRate }> {
-    const response = await apiClient.get<{ rate: ExchangeRate }>(`/transfer/rates/${source}/${target}`);
+    const response = await apiClient.get<{ rate: ExchangeRate }>(`/fx/${source}/${target}`);
     return response;
   }
 

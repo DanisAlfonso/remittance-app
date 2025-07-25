@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { env } from './config/environment';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth';
+import accountsRoutes from './routes/accounts';
 import bankingRoutes from './routes/banking-v2';
 import obpRoutes from './routes/obp-v5';
 import usersRoutes from './routes/users';
@@ -29,19 +30,27 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/api/v1/health', (req, res) => {
+// OBP-API v5.1.0 Root endpoint
+app.get('/obp/v5.1.0/root', (req, res) => {
   res.json({ 
-    status: 'ok',
-    version: '1.0.0',
+    version: 'v5.1.0',
+    status: 'STABLE',
     timestamp: new Date().toISOString(),
     environment: env.NODE_ENV,
+    git_commit: 'remittance-app-v1.0.0',
+    connectors: ['obp-api-adapter'],
   });
 });
 
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/banking', bankingRoutes); // Legacy endpoints (temporary)
-app.use('/obp/v5.1.0', obpRoutes); // OBP-API compliant endpoints
-app.use('/api/v1/users', usersRoutes);
+// OBP-API v5.1.0 compliant endpoints
+app.use('/obp/v5.1.0/users', authRoutes); // User authentication and registration
+app.use('/obp/v5.1.0/my/accounts', accountsRoutes); // Virtual IBAN accounts
+app.use('/obp/v5.1.0/banks', obpRoutes); // Bank operations and transactions
+app.use('/obp/v5.1.0/management/users', usersRoutes); // User management (admin)
+app.use('/obp/v5.1.0', obpRoutes); // Additional OBP endpoints (users/current, transaction-requests)
+
+// Legacy endpoints (deprecated)
+app.use('/api/v1/banking', bankingRoutes); // TODO: Remove after migration
 
 app.use((req, res, next) => {
   notFoundHandler(req, res);

@@ -142,6 +142,15 @@ export default function ComprehensiveBankingDetails({ account, style }: Comprehe
             icon="business"
           />
         )}
+
+        {/* Bank Address */}
+        {account.bankAddress && (
+          <CopyableField
+            label="Bank Address"
+            value={account.bankAddress}
+            icon="location-outline"
+          />
+        )}
       </View>
 
       {/* Footer Info */}

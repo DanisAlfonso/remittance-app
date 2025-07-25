@@ -161,6 +161,9 @@ enum TransactionType {
   WITHDRAWAL
   TRANSFER
   EXCHANGE
+  ACCOUNT_CREATION
+  INBOUND_TRANSFER
+  OUTBOUND_TRANSFER
 }
 
 enum TransactionStatus {

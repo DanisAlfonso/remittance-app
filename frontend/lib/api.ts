@@ -38,7 +38,7 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseURL}/api/v1${endpoint}`;
+    const url = `${this.baseURL}/obp/v5.1.0${endpoint}`;
     
     const headers = {
       ...this.defaultHeaders,

@@ -15,34 +15,34 @@ import type {
  */
 export class BankingService {
   /**
-   * Create a new bank account via OBP-API (NEW BANKING API)
+   * Create a new virtual account via OBP-API v5.1.0
    */
   async createAccount(request: CreateBankAccountRequest): Promise<CreateAccountResponse> {
-    const response = await apiClient.post<CreateAccountResponse>('/banking/accounts', request);
+    const response = await apiClient.post<CreateAccountResponse>('/my/accounts', request);
     return response;
   }
 
   /**
-   * Get all user's bank accounts (NEW BANKING API)
+   * Get all user's virtual accounts via OBP-API v5.1.0
    */
   async getAccounts(): Promise<GetAccountsResponse> {
-    const response = await apiClient.get<GetAccountsResponse>('/banking/accounts');
+    const response = await apiClient.get<GetAccountsResponse>('/my/accounts');
     return response;
   }
 
   /**
-   * Get account balance (NEW BANKING API)
+   * Get account balance via OBP-API v5.1.0
    */
   async getAccountBalance(accountId: string): Promise<GetBalanceResponse> {
-    const response = await apiClient.get<GetBalanceResponse>(`/banking/accounts/${accountId}/balance`);
+    const response = await apiClient.get<GetBalanceResponse>(`/my/accounts/${accountId}/balance`);
     return response;
   }
 
   /**
-   * Get detailed account information (NEW BANKING API)
+   * Get detailed account information via OBP-API v5.1.0
    */
   async getAccountDetails(accountId: string): Promise<GetAccountDetailsResponse> {
-    const response = await apiClient.get<GetAccountDetailsResponse>(`/banking/accounts/${accountId}`);
+    const response = await apiClient.get<GetAccountDetailsResponse>(`/my/accounts/${accountId}`);
     return response;
   }
 

@@ -2,6 +2,7 @@ import { Router, Request, Response, RequestHandler } from 'express';
 import { prisma } from '../config/database';
 import { hashPassword, comparePassword, validatePassword } from '../utils/password';
 import { generateToken } from '../middleware/auth';
+import { masterAccountBanking } from '../services/master-account-banking';
 import { z } from 'zod';
 
 const router = Router();
@@ -13,6 +14,7 @@ const registerSchema = z.object({
   lastName: z.string().min(1, 'Last name is required').max(50),
   phone: z.string().optional(),
   country: z.string().optional(),
+  preferredCurrencies: z.array(z.enum(['EUR', 'HNL'])).optional().default(['EUR']),
 });
 
 const loginSchema = z.object({
@@ -47,6 +49,7 @@ const registerHandler: RequestHandler = async (req: Request, res: Response) => {
 
     const hashedPassword = await hashPassword(validatedData.password);
 
+    // Create user first
     const user = await prisma.user.create({
       data: {
         email: validatedData.email,
@@ -68,6 +71,26 @@ const registerHandler: RequestHandler = async (req: Request, res: Response) => {
         createdAt: true,
       },
     });
+
+    // Create virtual accounts for preferred currencies
+    const virtualAccounts = [];
+    console.log(`🏦 Creating virtual accounts for user ${user.id} in currencies: ${validatedData.preferredCurrencies.join(', ')}`);
+    
+    for (const currency of validatedData.preferredCurrencies) {
+      try {
+        const accountLabel = `${user.firstName} ${user.lastName} ${currency} Account`;
+        const virtualAccount = await masterAccountBanking.createVirtualAccount(
+          user.id,
+          currency as 'EUR' | 'HNL',
+          accountLabel
+        );
+        virtualAccounts.push(virtualAccount);
+        console.log(`✅ Created ${currency} virtual account with IBAN: ${virtualAccount.virtualIBAN}`);
+      } catch (accountError) {
+        console.error(`❌ Failed to create ${currency} virtual account for user ${user.id}:`, accountError);
+        // Continue with other currencies even if one fails
+      }
+    }
 
     const sessionExpiresAt = new Date();
     sessionExpiresAt.setDate(sessionExpiresAt.getDate() + 1);
@@ -91,6 +114,12 @@ const registerHandler: RequestHandler = async (req: Request, res: Response) => {
       message: 'User registered successfully',
       user,
       token,
+      virtualAccounts: virtualAccounts.map(account => ({
+        currency: account.currency,
+        iban: account.virtualIBAN,
+        balance: account.balance,
+        status: account.status,
+      })),
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -212,8 +241,8 @@ const loginHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 };
 
-// Register routes
-router.post('/register', registerHandler);
-router.post('/login', loginHandler);
+// OBP-API v5.1.0 User routes
+router.post('/', registerHandler); // POST /obp/v5.1.0/users (create user)
+router.post('/current/logins/direct', loginHandler); // POST /obp/v5.1.0/users/current/logins/direct
 
 export default router;

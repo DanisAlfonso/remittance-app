@@ -570,13 +570,21 @@ export class OBPApiService {
       const eurFunding = await masterAccountBanking.fundAccountForTesting(userId, 'EUR', 1000);
       console.log('✅ EUR account funded:', eurFunding.referenceNumber);
       
+      // Also fund HNL account if the user has one
+      try {
+        const hnlFunding = await masterAccountBanking.fundAccountForTesting(userId, 'HNL', 25000);
+        console.log('✅ HNL account funded:', hnlFunding.referenceNumber);
+      } catch (hnlError) {
+        console.log('ℹ️ No HNL account found for user, skipping HNL funding');
+      }
+      
       return {
         success: true,
         data: {
           message: 'Internal funding completed (OBP-API unavailable)',
           method: 'INTERNAL_FUNDING',
-          total_accounts: 1,
-          funded_accounts: ['EUR: 1000.00'],
+          total_accounts: 2,
+          funded_accounts: ['EUR: 1000.00', 'HNL: 25000.00 (if account exists)'],
           note: 'This is a development fallback when OBP-API authentication fails'
         },
         statusCode: 200

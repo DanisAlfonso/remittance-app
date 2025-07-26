@@ -11,6 +11,7 @@ import type { Transfer } from '../../types/transfer';
 import { apiClient } from '../../lib/api';
 import { obpService } from '../../lib/obpService';
 import ProfileCircle from '../../components/ui/ProfileCircle';
+import AccountCarousel from '../../components/ui/AccountCarousel';
 
 
 export default function DashboardScreen() {
@@ -354,33 +355,42 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Premium Balance Card - Hero Section */}
-        {selectedAccount && balance && accounts.length > 0 && (
-          <View style={styles.balanceHeroCard}>
-            <View style={styles.balanceCardHeader}>
-              <Text style={styles.balanceCardTitle}>Total Balance</Text>
-            </View>
-            
-            <View style={styles.balanceDisplay}>
-              <Text style={styles.balanceAmount}>
-                {bankingService.formatAmount(balance.amount, selectedAccount.currency)}
-              </Text>
-              <View style={styles.balanceSubInfo}>
-                <Ionicons name="time-outline" size={12} color="#6B7280" />
-                <Text style={styles.lastUpdatedText}>
-                  Updated {lastRefreshTime ? lastRefreshTime.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  }) : balance.updatedAt ? new Date(balance.updatedAt).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  }) : 'Never'}
-                </Text>
+        {/* Account Carousel - Beautiful Horizontal Swipe */}
+        {accounts.length > 0 ? (
+          <AccountCarousel
+            accounts={accounts}
+            selectedAccount={selectedAccount}
+            balance={balance}
+            onAccountSelect={selectAccount}
+            onCreateAccount={() => router.push('/(dashboard)/create-currency-account')}
+            lastRefreshTime={lastRefreshTime}
+          />
+        ) : (
+          // Show create account prompt if no accounts exist
+          <View style={styles.noAccountsPrompt}>
+            <View style={styles.promptContent}>
+              <View style={styles.promptIcon}>
+                <Ionicons name="wallet" size={48} color="#3B82F6" />
               </View>
+              <Text style={styles.promptTitle}>Create Your First Account</Text>
+              <Text style={styles.promptText}>
+                Get started by creating a digital account for international transfers
+              </Text>
+              <Pressable 
+                style={styles.createFirstAccountButton}
+                onPress={() => router.push('/(dashboard)/create-currency-account')}
+              >
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+                <Text style={styles.createFirstAccountText}>Create Account</Text>
+              </Pressable>
             </View>
-            
+          </View>
+        )}
+
+        {/* Quick Actions - Updated positioning */}
+        {selectedAccount && balance && (
+          <View style={styles.quickActionsSection}>
+            <Text style={styles.quickActionsSectionTitle}>Quick Actions</Text>
             <View style={styles.quickActionsGrid}>
               <Pressable 
                 style={[styles.actionButton, styles.primaryAction]}
@@ -782,6 +792,87 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     color: '#3B82F6',
+  },
+
+  // No Accounts Prompt
+  noAccountsPrompt: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginBottom: 32,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  promptContent: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+    gap: 20,
+  },
+  promptIcon: {
+    padding: 20,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 24,
+  },
+  promptTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1E3A8A',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  promptText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  createFirstAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 8,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  createFirstAccountText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+
+  // Quick Actions Section
+  quickActionsSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginBottom: 24,
+    padding: 24,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  quickActionsSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 20,
+    letterSpacing: -0.3,
   },
   // 🏗️ Modern Section Design  
   modernSection: {

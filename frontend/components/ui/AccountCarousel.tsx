@@ -60,7 +60,7 @@ const AccountCard: React.FC<AccountCardProps> = ({
       case 'EUR':
         return ['#3B82F6', '#1E40AF']; // Blue gradient
       case 'HNL':
-        return ['#059669', '#047857']; // Green gradient
+        return ['#8B5CF6', '#7C3AED']; // Purple gradient
       case 'USD':
         return ['#7C3AED', '#5B21B6']; // Purple gradient
       default:
@@ -200,6 +200,14 @@ export default function AccountCarousel({
     const scrollOffset = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollOffset / screenWidth);
     setCurrentIndex(index);
+    
+    // Auto-select the account that's currently in view
+    if (index < accounts.length && accounts[index]) {
+      const accountInView = accounts[index];
+      if (selectedAccount?.id !== accountInView.id) {
+        onAccountSelect(accountInView.id);
+      }
+    }
   };
 
   const scrollToAccount = (index: number) => {

@@ -49,7 +49,7 @@ const CURRENCY_OPTIONS: CurrencyOption[] = [
       'Secure account management',
     ],
     icon: 'L',
-    gradient: ['#059669', '#047857'],
+    gradient: ['#8B5CF6', '#7C3AED'],
   },
 ];
 
@@ -85,7 +85,7 @@ export default function CreateCurrencyAccountScreen() {
       const currencyOption = CURRENCY_OPTIONS.find(c => c.code === selectedCurrency)!;
       
       const request: CreateBankAccountRequest = {
-        name: generateAccountName(selectedCurrency),
+        accountLabel: generateAccountName(selectedCurrency),
         currency: selectedCurrency,
         country: currencyOption.countryCode,
         type: 'SAVINGS',

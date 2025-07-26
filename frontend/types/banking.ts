@@ -53,7 +53,7 @@ export interface CreateBankAccountRequest {
   currency: string;
   country: string;
   type: 'SAVINGS' | 'CHECKING';
-  name: string;
+  accountLabel: string;
 }
 
 export interface BankingError {

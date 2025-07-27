@@ -145,17 +145,17 @@ const AccountCard: React.FC<AccountCardProps> = ({
       <View style={styles.quickActions}>
         <Pressable
           style={styles.quickActionButton}
-          onPress={() => router.push('/(dashboard)/send-money')}
-        >
-          <Ionicons name="paper-plane" size={16} color="#FFFFFF" />
-          <Text style={styles.quickActionText}>Send</Text>
-        </Pressable>
-        <Pressable
-          style={styles.quickActionButton}
           onPress={() => router.push('/(dashboard)/transactions')}
         >
           <Ionicons name="receipt" size={16} color="#FFFFFF" />
           <Text style={styles.quickActionText}>History</Text>
+        </Pressable>
+        <Pressable
+          style={styles.quickActionButton}
+          onPress={() => router.push('/(dashboard)/account-details')}
+        >
+          <Ionicons name="card" size={16} color="#FFFFFF" />
+          <Text style={styles.quickActionText}>Details</Text>
         </Pressable>
       </View>
 

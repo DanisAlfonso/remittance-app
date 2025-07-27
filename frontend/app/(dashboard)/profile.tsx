@@ -308,6 +308,24 @@ export default function ProfileScreen() {
           </View>
           
           <View style={styles.overviewGrid}>
+            <TouchableOpacity 
+              style={styles.overviewCard}
+              onPress={() => router.push('/(dashboard)/qr-profile')}
+              disabled={!user.username}
+            >
+              <View style={styles.overviewIcon}>
+                <Ionicons name="qr-code" size={20} color="#3B82F6" />
+              </View>
+              <Text style={styles.overviewLabel}>Payment QR Code</Text>
+              <Text style={styles.overviewValue}>@{user.username || 'Not assigned'}</Text>
+              {user.username && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="qr-code-outline" size={16} color="#3B82F6" />
+                  <Text style={styles.verifiedText}>Tap to View</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
             <View style={styles.overviewCard}>
               <View style={styles.overviewIcon}>
                 <Ionicons name="mail" size={20} color="#3B82F6" />
@@ -731,7 +749,7 @@ const styles = StyleSheet.create({
   },
   verifiedText: {
     fontSize: 11,
-    color: '#10B981',
+    color: '#3B82F6',
     fontWeight: '600',
   },
 

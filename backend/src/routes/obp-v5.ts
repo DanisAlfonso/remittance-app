@@ -958,7 +958,12 @@ router.get('/test-connectivity', testConnectivityHandler);
 
 /**
  * GET /obp/v5.1.0/debug/recent-transfers
- * Get recent transfers across all users (Debug endpoint)
+ * Get recent transfers across all users (Debug endpoint - REMOVE IN PRODUCTION)
+ * 
+ * ⚠️ SECURITY WARNING: This endpoint exposes user transaction data and should be:
+ * 1. Removed or restricted in production environments
+ * 2. Protected with admin-only authentication
+ * 3. Rate limited and logged for security auditing
  */
 const getRecentTransfersHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
@@ -1029,7 +1034,12 @@ const getRecentTransfersHandler: RequestHandler = async (req: AuthRequest, res: 
 
 /**
  * GET /obp/v5.1.0/debug/user-accounts
- * Get account info for specific users (Debug endpoint)
+ * Get account info for all users (Debug endpoint - REMOVE IN PRODUCTION)
+ * 
+ * ⚠️ SECURITY WARNING: This endpoint exposes user account data and should be:
+ * 1. Removed or restricted in production environments
+ * 2. Protected with admin-only authentication
+ * 3. Rate limited and logged for security auditing
  */
 const getUserAccountsHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
@@ -1047,35 +1057,40 @@ const getUserAccountsHandler: RequestHandler = async (req: AuthRequest, res: Res
 
     console.log('🔍 Getting user accounts for debugging...');
     
-    // Get specific users: Michelle and Danis
-    const michelleUser = await prisma.user.findFirst({
+    // Get all active users (dynamic, not hardcoded)
+    const allUsers = await prisma.user.findMany({
       where: {
-        OR: [
-          { firstName: { contains: 'Michelle', mode: 'insensitive' } },
-          { email: { contains: 'michelle', mode: 'insensitive' } }
-        ]
+        isActive: true
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 10, // Limit for performance
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        username: true,
+        createdAt: true
       }
     });
 
-    const danisUser = await prisma.user.findFirst({
+    // Get accounts for all users
+    const allAccounts = await prisma.bankAccount.findMany({
       where: {
-        OR: [
-          { firstName: { contains: 'Danis', mode: 'insensitive' } },
-          { email: { contains: 'danis', mode: 'insensitive' } }
-        ]
+        userId: { in: allUsers.map(u => u.id) },
+        status: 'ACTIVE'
+      },
+      orderBy: { balanceUpdatedAt: 'desc' },
+      select: {
+        id: true,
+        userId: true,
+        currency: true,
+        lastBalance: true,
+        iban: true,
+        balanceUpdatedAt: true,
+        name: true
       }
     });
-
-    // Get their accounts
-    const michelleAccounts = michelleUser ? await prisma.bankAccount.findMany({
-      where: { userId: michelleUser.id },
-      orderBy: { balanceUpdatedAt: 'desc' }
-    }) : [];
-
-    const danisAccounts = danisUser ? await prisma.bankAccount.findMany({
-      where: { userId: danisUser.id },
-      orderBy: { balanceUpdatedAt: 'desc' }
-    }) : [];
 
     // Check all recent balance changes across all accounts
     const allRecentAccounts = await prisma.bankAccount.findMany({
@@ -1096,31 +1111,31 @@ const getUserAccountsHandler: RequestHandler = async (req: AuthRequest, res: Res
       }
     });
 
+    // Group accounts by user for organized response
+    const userAccountsMap = new Map();
+    allUsers.forEach(user => {
+      const userAccounts = allAccounts.filter(acc => acc.userId === user.id);
+      userAccountsMap.set(user.id, {
+        user: {
+          id: user.id,
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          username: user.username,
+          memberSince: user.createdAt
+        },
+        accounts: userAccounts.map(acc => ({
+          currency: acc.currency,
+          balance: acc.lastBalance,
+          iban: acc.iban?.slice(-4), // Only show last 4 for security
+          name: acc.name,
+          updated_at: acc.balanceUpdatedAt
+        }))
+      });
+    });
+
     res.json({
-      michelle_user: michelleUser ? {
-        id: michelleUser.id,
-        name: `${michelleUser.firstName} ${michelleUser.lastName}`,
-        email: michelleUser.email
-      } : null,
-      michelle_accounts: michelleAccounts.map(acc => ({
-        currency: acc.currency,
-        balance: acc.lastBalance,
-        iban: acc.iban,
-        updated_at: acc.balanceUpdatedAt,
-        status: acc.status
-      })),
-      danis_user: danisUser ? {
-        id: danisUser.id,
-        name: `${danisUser.firstName} ${danisUser.lastName}`,
-        email: danisUser.email
-      } : null,
-      danis_accounts: danisAccounts.map(acc => ({
-        currency: acc.currency,
-        balance: acc.lastBalance,
-        iban: acc.iban,
-        updated_at: acc.balanceUpdatedAt,
-        status: acc.status
-      })),
+      total_users: allUsers.length,
+      users_with_accounts: Array.from(userAccountsMap.values()),
       recent_balance_changes: allRecentAccounts.map(acc => ({
         user_name: `${acc.user.firstName} ${acc.user.lastName}`,
         user_email: acc.user.email,
@@ -1144,7 +1159,12 @@ const getUserAccountsHandler: RequestHandler = async (req: AuthRequest, res: Res
 
 /**
  * GET /obp/v5.1.0/debug/transfer-history
- * Get detailed transfer history including outbound and inbound transfers
+ * Get detailed transfer history including outbound and inbound transfers (Debug endpoint - REMOVE IN PRODUCTION)
+ * 
+ * ⚠️ SECURITY WARNING: This endpoint exposes detailed transaction history and should be:
+ * 1. Removed or restricted in production environments
+ * 2. Protected with admin-only authentication
+ * 3. Rate limited and logged for security auditing
  */
 const getTransferHistoryHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
@@ -1177,18 +1197,34 @@ const getTransferHistoryHandler: RequestHandler = async (req: AuthRequest, res: 
       }
     });
 
-    // Get Michelle and Danis specifically
-    const michelleUser = await prisma.user.findFirst({
-      where: { email: { contains: 'michelle', mode: 'insensitive' } }
+    // Get all users to organize transactions by user
+    const allUsers = await prisma.user.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        username: true
+      }
     });
 
-    const danisUser = await prisma.user.findFirst({
-      where: { email: { contains: 'danis', mode: 'insensitive' } }
+    // Group transactions by user
+    const transactionsByUser = new Map();
+    allUsers.forEach(user => {
+      const userTransactions = recentTransactions.filter(t => t.userId === user.id);
+      if (userTransactions.length > 0) {
+        transactionsByUser.set(user.id, {
+          user: {
+            id: user.id,
+            name: `${user.firstName} ${user.lastName}`,
+            email: user.email,
+            username: user.username
+          },
+          transactions: userTransactions
+        });
+      }
     });
-
-    // Get their recent transactions
-    const michelleTransactions = recentTransactions.filter(t => t.userId === michelleUser?.id);
-    const danisTransactions = recentTransactions.filter(t => t.userId === danisUser?.id);
 
     res.json({
       all_recent_transactions: recentTransactions.map(t => ({
@@ -1202,28 +1238,22 @@ const getTransferHistoryHandler: RequestHandler = async (req: AuthRequest, res: 
         user_email: t.user.email,
         created_at: t.createdAt
       })),
-      michelle_transactions: michelleTransactions.map(t => ({
-        type: t.type,
-        status: t.status,
-        amount: t.amount,
-        currency: t.currency,
-        reference: t.referenceNumber,
-        created_at: t.createdAt
-      })),
-      danis_transactions: danisTransactions.map(t => ({
-        type: t.type,
-        status: t.status,
-        amount: t.amount,
-        currency: t.currency,
-        reference: t.referenceNumber,
-        created_at: t.createdAt
+      transactions_by_user: Array.from(transactionsByUser.values()).map(userGroup => ({
+        user: userGroup.user,
+        transaction_count: userGroup.transactions.length,
+        transactions: userGroup.transactions.map((t: any) => ({
+          type: t.type,
+          status: t.status,
+          amount: t.amount,
+          currency: t.currency,
+          reference: t.referenceNumber,
+          created_at: t.createdAt
+        }))
       })),
       summary: {
         total_transactions: recentTransactions.length,
-        michelle_count: michelleTransactions.length,
-        danis_count: danisTransactions.length,
-        michelle_user_id: michelleUser?.id,
-        danis_user_id: danisUser?.id
+        active_users_with_transactions: transactionsByUser.size,
+        total_users: allUsers.length
       },
       timestamp: new Date().toISOString()
     });
@@ -1238,7 +1268,7 @@ const getTransferHistoryHandler: RequestHandler = async (req: AuthRequest, res: 
   }
 };
 
-// Debug endpoints
+// Debug endpoints - ⚠️ REMOVE IN PRODUCTION or restrict to admin users only
 router.get('/debug/recent-transfers', getRecentTransfersHandler);
 router.get('/debug/user-accounts', getUserAccountsHandler);
 router.get('/debug/transfer-history', getTransferHistoryHandler);

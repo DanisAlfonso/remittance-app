@@ -1,8 +1,10 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import { prisma } from '../config/database';
 import { hashPassword, comparePassword, validatePassword } from '../utils/password';
-import { generateToken } from '../middleware/auth';
+import { generateToken, authenticateToken, AuthRequest } from '../middleware/auth';
 import { masterAccountBanking } from '../services/master-account-banking';
+import { UserSearchService } from '../services/userSearch';
+import { UsernameGenerator } from '../utils/usernameGenerator';
 import { z } from 'zod';
 
 const router = Router();
@@ -21,6 +23,20 @@ const loginSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(1, 'Password is required'),
 });
+
+const searchQuerySchema = z.object({
+  query: z.string().min(1).max(100).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().min(1).max(20).optional(),
+  limit: z.coerce.number().min(1).max(50).default(10),
+  offset: z.coerce.number().min(0).default(0),
+  sortBy: z.enum(['relevance', 'recent', 'alphabetical']).default('relevance'),
+}).refine(
+  (data) => data.query || data.email || data.phone,
+  {
+    message: "At least one search parameter (query, email, or phone) must be provided",
+  }
+);
 
 const registerHandler: RequestHandler = async (req: Request, res: Response) => {
   try {
@@ -49,6 +65,13 @@ const registerHandler: RequestHandler = async (req: Request, res: Response) => {
 
     const hashedPassword = await hashPassword(validatedData.password);
 
+    // Generate unique username
+    const username = await UsernameGenerator.generateUniqueUsername(
+      validatedData.firstName,
+      validatedData.lastName
+    );
+    console.log(`🏷️ Generated username: @${username} for ${validatedData.firstName} ${validatedData.lastName}`);
+
     // Create user first
     const user = await prisma.user.create({
       data: {
@@ -58,6 +81,8 @@ const registerHandler: RequestHandler = async (req: Request, res: Response) => {
         lastName: validatedData.lastName,
         phone: validatedData.phone,
         country: validatedData.country,
+        username,
+        isSearchable: true, // Enable user to be found by others
       },
       select: {
         id: true,
@@ -66,6 +91,7 @@ const registerHandler: RequestHandler = async (req: Request, res: Response) => {
         lastName: true,
         phone: true,
         country: true,
+        username: true,
         isActive: true,
         emailVerified: true,
         createdAt: true,
@@ -210,6 +236,7 @@ const loginHandler: RequestHandler = async (req: Request, res: Response) => {
       lastName: user.lastName,
       phone: user.phone,
       country: user.country,
+      username: user.username,
       isActive: user.isActive,
       emailVerified: user.emailVerified,
       createdAt: user.createdAt,
@@ -241,8 +268,205 @@ const loginHandler: RequestHandler = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * Search users for transfers - accessible at /obp/v5.1.0/users/search
+ */
+const searchUsers: RequestHandler = async (req: AuthRequest, res) => {
+  try {
+    const currentUserId = req.user!.id;
+    
+    // Validate and sanitize query parameters
+    const validation = searchQuerySchema.safeParse(req.query);
+    if (!validation.success) {
+      res.status(400).json({
+        error: 'Invalid search parameters',
+        details: validation.error.errors,
+        message: 'Please check your search parameters and try again'
+      });
+      return;
+    }
+    
+    const { query, email, phone, limit, offset, sortBy } = validation.data;
+    
+    // Use optimized search service
+    const searchResult = await UserSearchService.searchUsers(currentUserId, {
+      query,
+      email, 
+      phone,
+      limit,
+      offset,
+      sortBy
+    });
+    
+    // Get account information for search results (for transfer availability)
+    const userIds = searchResult.results.map(user => user.id);
+    const usersWithAccounts = await prisma.user.findMany({
+      where: {
+        id: { in: userIds }
+      },
+      select: {
+        id: true,
+        bankAccounts: {
+          where: {
+            status: 'ACTIVE',
+          },
+          take: 1,
+          select: {
+            currency: true,
+            country: true,
+          }
+        }
+      }
+    });
+    
+    const accountMap = new Map(
+      usersWithAccounts.map(user => [
+        user.id, 
+        user.bankAccounts[0] || null
+      ])
+    );
+
+    // Format results for frontend compatibility
+    const formattedResults = searchResult.results.map(user => ({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName || `${user.firstName} ${user.lastName}`,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email || undefined,
+      phone: user.phone || undefined,
+      memberSince: user.createdAt.toISOString(),
+      // Account availability for transfers (without exposing IBAN)
+      hasActiveAccount: !!accountMap.get(user.id),
+      primaryCurrency: accountMap.get(user.id)?.currency || null,
+      country: accountMap.get(user.id)?.country || null,
+    }));
+    
+    res.json({
+      success: true,
+      results: formattedResults,
+      count: formattedResults.length,
+      totalCount: searchResult.totalCount,
+      hasMore: searchResult.hasMore,
+      pagination: {
+        limit: searchResult.limit,
+        offset: searchResult.offset,
+        totalCount: searchResult.totalCount,
+        hasNextPage: searchResult.hasMore,
+        hasPreviousPage: searchResult.offset > 0,
+      }
+    });
+    
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({
+      error: 'Search service temporarily unavailable',
+      message: 'Please try again in a moment'
+    });
+  }
+};
+
+/**
+ * Get user by ID for transfers (with IBAN information)
+ * This endpoint returns user information including their primary account IBAN
+ * for real bank transfers via @username
+ */
+const getUserById: RequestHandler = async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user!.id;
+    
+    if (id === currentUserId) {
+      res.status(400).json({
+        error: 'Cannot send money to yourself'
+      });
+      return;
+    }
+    
+    const user = await prisma.user.findUnique({
+      where: {
+        id,
+        isSearchable: true,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        createdAt: true,
+        bankAccounts: {
+          where: {
+            status: 'ACTIVE',
+          },
+          orderBy: {
+            createdAt: 'asc', // Primary account is usually the first created
+          },
+          take: 1, // Get primary account
+          select: {
+            id: true,
+            currency: true,
+            country: true,
+            iban: true,
+            accountNumber: true,
+            name: true,
+          }
+        }
+      }
+    });
+    
+    if (!user) {
+      res.status(404).json({
+        error: 'User not found or not available for transfers'
+      });
+      return;
+    }
+    
+    // Check if user has an active account with IBAN
+    const primaryAccount = user.bankAccounts[0];
+    if (!primaryAccount || !primaryAccount.iban) {
+      res.status(404).json({
+        error: 'User does not have an active account available for transfers'
+      });
+      return;
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName || `${user.firstName} ${user.lastName}`,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        memberSince: user.createdAt.toISOString(),
+        // Primary account information for transfers
+        primaryAccount: {
+          id: primaryAccount.id,
+          currency: primaryAccount.currency,
+          country: primaryAccount.country,
+          iban: primaryAccount.iban,
+          accountNumber: primaryAccount.accountNumber,
+          name: primaryAccount.name,
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({
+      error: 'Failed to get user details'
+    });
+  }
+};
+
 // OBP-API v5.1.0 User routes
 router.post('/', registerHandler); // POST /obp/v5.1.0/users (create user)
 router.post('/current/logins/direct', loginHandler); // POST /obp/v5.1.0/users/current/logins/direct
+router.get('/search', authenticateToken, searchUsers); // GET /obp/v5.1.0/users/search
+router.get('/:id', authenticateToken, getUserById); // GET /obp/v5.1.0/users/{userId}
 
 export default router;

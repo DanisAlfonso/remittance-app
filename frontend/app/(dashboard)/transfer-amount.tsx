@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useWalletStore } from '../../lib/walletStore';
@@ -33,6 +33,53 @@ export default function TransferAmountScreen() {
   const { selectedAccount, balance } = useWalletStore();
   const { token } = useAuthStore();
   
+  // Function to fetch user by username (for QR code scanning)
+  const fetchUserByUsername = async (username: string): Promise<{
+    id: string;
+    displayName: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+  }> => {
+    try {
+      console.log('🔍 Searching for username:', username);
+      console.log('🔑 Token available:', !!token);
+      
+      const response = await apiClient.get(`/users/search?query=${username}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }) as {
+        results: Array<{
+          id: string;
+          displayName: string;
+          firstName: string;
+          lastName: string;
+          username: string;
+        }>
+      };
+      
+      console.log('📦 Search response:', response);
+      
+      if (!response.results || response.results.length === 0) {
+        console.log('❌ No users found in response');
+        throw new Error(`User @${username} not found`);
+      }
+      
+      const user = response.results.find(u => u.username === username);
+      console.log('👤 Found matching user:', user);
+      
+      if (!user) {
+        console.log('❌ No user with exact username match');
+        console.log('Available users:', response.results.map(u => u.username));
+        throw new Error(`User @${username} not found`);
+      }
+      
+      return user;
+    } catch (error) {
+      console.error('❌ Error fetching user by username:', error);
+      throw new Error(`Unable to find user @${username}`);
+    }
+  };
+
   // Function to fetch user IBAN for @username transfers
   const fetchUserIban = async (userId: string): Promise<{
     holderName: string;
@@ -77,11 +124,11 @@ export default function TransferAmountScreen() {
   
   const currency = params.currency as string;
   
-  // Handle both JSON recipientData (from add-recipient) and individual params (from user-search)
+  // Handle both JSON recipientData (from add-recipient) and individual params (from user-search/QR)
   const recipientData: Partial<RecipientData> = params.recipientData 
     ? JSON.parse(params.recipientData as string) as RecipientData
     : {
-        // From user search - this will be @username transfer
+        // From user search or QR scan - this will be @username transfer
         id: params.recipientId as string,
         name: params.recipientName as string,
         type: 'user', // @username transfer type
@@ -97,6 +144,8 @@ export default function TransferAmountScreen() {
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null);
   const [isLoadingRate, setIsLoadingRate] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [resolvedRecipient, setResolvedRecipient] = useState<RecipientData | null>(null);
+  const [isLoadingRecipient, setIsLoadingRecipient] = useState(false);
   // All transfers are now free - no fees
 
   useEffect(() => {
@@ -104,6 +153,50 @@ export default function TransferAmountScreen() {
       loadExchangeRate();
     }
   }, [selectedAccount, currency]);
+
+  // Handle username lookup for QR code scanning
+  useEffect(() => {
+    const resolveRecipient = async () => {
+      // If we have username but no ID (QR code scenario), look up the user
+      if (recipientData.username && !recipientData.id && !isLoadingRecipient) {
+        setIsLoadingRecipient(true);
+        try {
+          console.log('🔍 Looking up user by username:', recipientData.username);
+          const user = await fetchUserByUsername(recipientData.username);
+          
+          console.log('✅ Found user:', user);
+          
+          // Update recipient data with resolved user info
+          const updatedRecipientData: RecipientData = {
+            ...recipientData as RecipientData,
+            id: user.id,
+            name: user.displayName,
+            holderName: user.displayName,
+            type: 'user',
+            currency: currency || 'EUR'
+          };
+          
+          setResolvedRecipient(updatedRecipientData);
+        } catch (error) {
+          console.error('❌ Failed to lookup user:', error);
+          Alert.alert(
+            'User Not Found',
+            `Unable to find user @${recipientData.username}. Please check the username and try again.`,
+            [
+              { text: 'OK', onPress: () => router.back() }
+            ]
+          );
+        } finally {
+          setIsLoadingRecipient(false);
+        }
+      } else if (recipientData.id) {
+        // We already have complete recipient data
+        setResolvedRecipient(recipientData as RecipientData);
+      }
+    };
+
+    resolveRecipient();
+  }, [recipientData.username, recipientData.id]);
 
   const loadExchangeRate = async () => {
     if (!selectedAccount || !token) {
@@ -194,22 +287,22 @@ export default function TransferAmountScreen() {
   };
 
   const handleSendMoney = async () => {
-    if (!validateAmount() || !selectedAccount || !token) {
+    if (!validateAmount() || !selectedAccount || !token || !resolvedRecipient) {
       return;
     }
     
     setIsProcessing(true);
     
     try {
-      let finalRecipientData = { ...recipientData };
+      let finalRecipientData = { ...resolvedRecipient };
       
       // If this is a @username transfer, fetch the user's IBAN first
-      if (recipientData.type === 'user' && recipientData.id) {
-        const userIbanData = await fetchUserIban(recipientData.id);
+      if (resolvedRecipient.type === 'user' && resolvedRecipient.id) {
+        const userIbanData = await fetchUserIban(resolvedRecipient.id);
         
         // Update recipient data with real IBAN information
         finalRecipientData = {
-          ...recipientData,
+          ...resolvedRecipient,
           holderName: userIbanData.holderName,
           iban: userIbanData.iban,
           country: userIbanData.country,
@@ -344,9 +437,15 @@ export default function TransferAmountScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Send {currency}</Text>
             <Text style={styles.subtitle}>
-              To {recipientData.type === 'internal' 
-                  ? recipientData.name 
-                  : recipientData.holderName}
+              {isLoadingRecipient ? (
+                'Looking up recipient...'
+              ) : resolvedRecipient ? (
+                `To ${resolvedRecipient.type === 'internal' 
+                    ? resolvedRecipient.name 
+                    : resolvedRecipient.holderName || resolvedRecipient.name}`
+              ) : (
+                `To @${recipientData.username || 'user'}`
+              )}
             </Text>
           </View>
 
@@ -418,33 +517,45 @@ export default function TransferAmountScreen() {
           {/* Recipient Info */}
           <View style={styles.recipientCard}>
             <Text style={styles.recipientTitle}>Recipient</Text>
-            <View style={styles.recipientInfo}>
-              <Text style={styles.recipientName}>
-                {recipientData.type === 'internal' 
-                  ? recipientData.name 
-                  : recipientData.holderName}
-              </Text>
-              
-              {recipientData.type === 'internal' ? (
-                // Internal transfer (app user)
-                <>
-                  {recipientData.username && (
+            {isLoadingRecipient ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#3B82F6" />
+                <Text style={styles.loadingText}>Looking up @{recipientData.username}...</Text>
+              </View>
+            ) : resolvedRecipient ? (
+              <View style={styles.recipientInfo}>
+                <Text style={styles.recipientName}>
+                  {resolvedRecipient.type === 'internal' 
+                    ? resolvedRecipient.name 
+                    : resolvedRecipient.holderName || resolvedRecipient.name}
+                </Text>
+                
+                {resolvedRecipient.type === 'user' || resolvedRecipient.type === 'internal' ? (
+                  // App user transfer
+                  <>
+                    {(resolvedRecipient.username || recipientData.username) && (
+                      <Text style={styles.recipientIban}>
+                        @{resolvedRecipient.username || recipientData.username}
+                      </Text>
+                    )}
+                    <Text style={styles.recipientBank}>App User Transfer</Text>
+                  </>
+                ) : (
+                  // External bank transfer
+                  <>
                     <Text style={styles.recipientIban}>
-                      @{recipientData.username}
+                      {resolvedRecipient.iban?.replace(/(.{4})/g, '$1 ').trim()}
                     </Text>
-                  )}
-                  <Text style={styles.recipientBank}>App User Transfer</Text>
-                </>
-              ) : (
-                // External bank transfer
-                <>
-                  <Text style={styles.recipientIban}>
-                    {recipientData.iban?.replace(/(.{4})/g, '$1 ').trim()}
-                  </Text>
-                  <Text style={styles.recipientBank}>{recipientData.bankName}</Text>
-                </>
-              )}
-            </View>
+                    <Text style={styles.recipientBank}>{resolvedRecipient.bankName}</Text>
+                  </>
+                )}
+              </View>
+            ) : (
+              <View style={styles.recipientInfo}>
+                <Text style={styles.recipientName}>@{recipientData.username}</Text>
+                <Text style={styles.recipientBank}>Resolving user...</Text>
+              </View>
+            )}
           </View>
         </ScrollView>
 
@@ -454,7 +565,7 @@ export default function TransferAmountScreen() {
             title={`Send ${amount ? formatCurrency(parseFloat(amount), selectedAccount?.currency || 'EUR') : 'Money'}`}
             onPress={handleSendMoney}
             loading={isProcessing}
-            disabled={!amount || parseFloat(amount) <= 0 || isLoadingRate}
+            disabled={!amount || parseFloat(amount) <= 0 || isLoadingRate || isLoadingRecipient || !resolvedRecipient}
             style={styles.sendButton}
             textStyle={styles.sendButtonText}
           />
@@ -685,5 +796,19 @@ const styles = StyleSheet.create({
     color: '#059669',
     fontWeight: '700',
     fontSize: 15,
+  },
+  
+  // Loading Container
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: '500',
   },
 });

@@ -427,6 +427,30 @@ export default function DashboardScreen() {
               </Pressable>
               
               <Pressable 
+                style={[styles.actionButton, styles.qrAction]}
+                onPress={() => router.push('/(dashboard)/qr-profile')}
+                disabled={!user.username}
+              >
+                <View style={[styles.actionIconContainer, styles.qrIconContainer]}>
+                  <Ionicons name="qr-code" size={24} color="#FFFFFF" />
+                </View>
+                <Text style={[styles.actionButtonText, styles.qrActionText]}>My QR Code</Text>
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.actionButton, styles.scanAction]}
+                onPress={() => router.push('/(dashboard)/qr-scanner')}
+              >
+                <View style={[styles.actionIconContainer, styles.scanIconContainer]}>
+                  <Ionicons name="scan" size={24} color="#FFFFFF" />
+                </View>
+                <Text style={[styles.actionButtonText, styles.scanActionText]}>Scan QR</Text>
+              </Pressable>
+            </View>
+            
+            {/* Secondary Action Row */}
+            <View style={styles.secondaryActionsGrid}>
+              <Pressable 
                 style={[styles.actionButton, styles.secondaryAction]} 
                 onPress={handleImportSandboxData}
                 disabled={isImportingSandbox}
@@ -772,6 +796,11 @@ const styles = StyleSheet.create({
   quickActionsGrid: {
     flexDirection: 'row',
     gap: 16, // Perfect spacing
+    marginBottom: 16,
+  },
+  secondaryActionsGrid: {
+    flexDirection: 'row',
+    gap: 16, // Perfect spacing
   },
   actionButton: {
     flex: 1,
@@ -791,6 +820,22 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  qrAction: {
+    backgroundColor: '#10B981', // Green for QR code
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  scanAction: {
+    backgroundColor: '#8B5CF6', // Purple for scan
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   secondaryAction: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
@@ -804,6 +849,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  qrIconContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  scanIconContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
   secondaryIconContainer: {
     backgroundColor: '#EEF2FF',
   },
@@ -813,6 +864,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: 0.3,
+  },
+  qrActionText: {
+    color: '#FFFFFF',
+  },
+  scanActionText: {
+    color: '#FFFFFF',
   },
   secondaryActionText: {
     color: '#3B82F6',

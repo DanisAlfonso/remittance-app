@@ -1,6 +1,6 @@
-import { Router, Request, Response, RequestHandler } from 'express';
+import { Router, Response, RequestHandler } from 'express';
 import { masterAccountBanking } from '../services/master-account-banking';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
 
 const router = Router();
@@ -11,9 +11,9 @@ router.use(authenticateToken);
 /**
  * Get user's virtual accounts
  */
-const getUserAccountsHandler: RequestHandler = async (req: Request, res: Response) => {
+const getUserAccountsHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     
     if (!userId) {
       res.status(401).json({
@@ -67,9 +67,9 @@ const createVirtualAccountSchema = z.object({
   accountLabel: z.string().min(1, 'Account label is required').max(100),
 });
 
-const createVirtualAccountHandler: RequestHandler = async (req: Request, res: Response) => {
+const createVirtualAccountHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     
     if (!userId) {
       res.status(401).json({
@@ -131,9 +131,9 @@ const getTransactionHistorySchema = z.object({
   limit: z.number().min(1).max(100).optional().default(50),
 });
 
-const getTransactionHistoryHandler: RequestHandler = async (req: Request, res: Response) => {
+const getTransactionHistoryHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     
     if (!userId) {
       res.status(401).json({
@@ -157,7 +157,7 @@ const getTransactionHistoryHandler: RequestHandler = async (req: Request, res: R
     
     res.json({
       message: 'Transaction history retrieved successfully',
-      transactions: transactions.map(tx => ({
+      transactions: transactions.map((tx: any) => ({
         id: tx.id,
         type: tx.type,
         status: tx.status,

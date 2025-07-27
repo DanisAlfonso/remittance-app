@@ -50,6 +50,7 @@ model User {
   sentInternalTransfers     InternalTransfer[] @relation("Sender")
   receivedInternalTransfers InternalTransfer[] @relation("Recipient")
   
+  
   // Performance indexes for user search
   @@index([firstName])
   @@index([lastName]) 
@@ -326,3 +327,4 @@ enum BankTransactionStatus {
   FAILED
   CANCELLED
 }
+

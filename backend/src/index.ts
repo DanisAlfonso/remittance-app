@@ -18,7 +18,16 @@ app.use(cors({
   origin: env.CORS_ORIGIN,
   credentials: true,
 }));
-app.use(morgan('combined'));
+// Only log important requests, skip health checks and assets
+app.use(morgan('tiny', {
+  skip: (req, res) => {
+    // Skip health checks and frequent polling
+    if (req.url === '/health') return true;
+    if (req.url.startsWith('/media')) return true;
+    if (req.url.includes('hot-update')) return true;
+    return false;
+  }
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 

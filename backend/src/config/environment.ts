@@ -44,10 +44,10 @@ function validateEnvironment(): EnvironmentConfig {
     RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
     RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
     // Legacy service configuration removed - using pure banking APIs
-    // OBP-API defaults (using the values from our successful OBP-API setup)
+    // OBP-API defaults (using local OBP-API server and setup script credentials)
     OBP_API_BASE_URL: process.env.OBP_API_BASE_URL || 'http://127.0.0.1:8080',
-    OBP_CONSUMER_KEY: process.env.OBP_CONSUMER_KEY || 'vttcad5o5fas3tmuifj5stclbuei4letdtstk4zu',
-    OBP_CONSUMER_SECRET: process.env.OBP_CONSUMER_SECRET || 'i1a1qsi0sy3lux4xjhmfg4n1y1besylzvvplkl0x',
+    OBP_CONSUMER_KEY: process.env.OBP_CONSUMER_KEY || 'mwtu30rvv5u3q40swprmrlc34llkjgb4xvhawrme',
+    OBP_CONSUMER_SECRET: process.env.OBP_CONSUMER_SECRET || 'bzz1ceaup2wtptptjok5yg22vti5mi5q3ei5ucfc',
     OBP_USERNAME: process.env.OBP_USERNAME || 'bootstrap',
     OBP_PASSWORD: process.env.OBP_PASSWORD || 'BootstrapPass123!',
   };

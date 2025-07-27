@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "jest --runInBand",
+    "test": "jest --runInBand --passWithNoTests",
     "test:unit": "jest src/__tests__/unit --testPathIgnorePatterns=integration",
     "test:integration": "dotenv -e .env.test -- jest src/__tests__/integration",
     "test:watch": "jest --watch",

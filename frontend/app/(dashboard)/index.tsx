@@ -655,7 +655,7 @@ export default function DashboardScreen() {
                     <View style={styles.activityAmountContainer}>
                       <Text style={[
                         styles.activityAmountModern,
-                        { color: transferType === 'send' ? '#6B7280' : '#10B981' }
+                        { color: transferType === 'send' ? '#3B82F6' : '#10B981' }
                       ]}>
                         {transferType === 'send' ? '-' : '+'}${amount.toFixed(2)}
                       </Text>

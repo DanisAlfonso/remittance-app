@@ -20,6 +20,19 @@ export default function TransactionsScreen() {
     try {
       setError(null);
       const response = await transferService.getTransferHistory(50, 0); // Load more transactions
+      
+      // Debug: Log the transfer data to understand the issue
+      console.log('🔍 Debug: Transfer data received:', response.transfers);
+      response.transfers.forEach((transfer, index) => {
+        console.log(`Transfer ${index}:`, {
+          id: transfer.id,
+          sourceAmount: transfer.sourceAmount,
+          sourceCurrency: transfer.sourceCurrency,
+          description: transfer.description,
+          type: transfer.sourceAmount > 0 ? 'receive' : 'send'
+        });
+      });
+      
       setTransfers(response.transfers);
     } catch (error: unknown) {
       console.error('Failed to load transfers:', error);
@@ -35,11 +48,28 @@ export default function TransactionsScreen() {
     setIsRefreshing(false);
   };
 
+  const formatCurrency = (amount: number, currencyCode: string): string => {
+    const currencySymbols: Record<string, string> = {
+      'EUR': '€',
+      'USD': '$',
+      'HNL': 'L', // Honduran Lempira
+    };
+    
+    const symbol = currencySymbols[currencyCode] || currencyCode;
+    return `${symbol}${amount.toFixed(2)}`;
+  };
+
   const calculateSummary = () => {
     let totalSent = 0;
     let totalReceived = 0;
+    let primaryCurrency = 'EUR'; // Default to EUR
 
     transfers.forEach((transfer) => {
+      // Use the first transfer's currency as primary currency for summary
+      if (primaryCurrency === 'EUR' && transfer.sourceCurrency) {
+        primaryCurrency = transfer.sourceCurrency;
+      }
+      
       if (transfer.sourceAmount > 0) {
         // Incoming transfer (positive amount)
         totalReceived += transfer.sourceAmount;
@@ -49,7 +79,7 @@ export default function TransactionsScreen() {
       }
     });
 
-    return { totalSent, totalReceived };
+    return { totalSent, totalReceived, primaryCurrency };
   };
 
   const getTransferType = (transfer: Transfer): 'send' | 'receive' => {
@@ -121,12 +151,12 @@ export default function TransactionsScreen() {
         <View style={styles.transactionIconContainer}>
           <View style={[
             styles.transactionIcon,
-            { backgroundColor: transferType === 'send' ? '#FEF2F2' : '#F0FDF4' }
+            { backgroundColor: transferType === 'send' ? '#EEF2FF' : '#F0FDF4' }
           ]}>
             <Ionicons 
               name={transferType === 'send' ? "arrow-up" : "arrow-down"}
               size={20} 
-              color={transferType === 'send' ? "#EF4444" : "#10B981"} 
+              color={transferType === 'send' ? "#3B82F6" : "#10B981"} 
             />
           </View>
         </View>
@@ -168,9 +198,9 @@ export default function TransactionsScreen() {
           <View style={styles.amountSection}>
             <Text style={[
               styles.modernAmount,
-              { color: transferType === 'send' ? '#6B7280' : '#10B981' }
+              { color: transferType === 'send' ? '#3B82F6' : '#10B981' }
             ]}>
-              {transferType === 'send' ? '-' : '+'}${amount.toFixed(2)}
+              {transferType === 'send' ? '-' : '+'}{formatCurrency(amount, currency)}
             </Text>
             <Text style={styles.modernCurrency}>{currency}</Text>
           </View>
@@ -203,11 +233,11 @@ export default function TransactionsScreen() {
         <View style={styles.summaryCardModern}>
           <View style={styles.summaryHeader}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="arrow-up-circle" size={24} color="#EF4444" />
+              <Ionicons name="arrow-up-circle" size={24} color="#3B82F6" />
             </View>
             <Text style={styles.summaryTitleModern}>Total Sent</Text>
           </View>
-          <Text style={styles.summaryValueModern}>${calculateSummary().totalSent.toFixed(2)}</Text>
+          <Text style={styles.summaryValueModern}>{formatCurrency(calculateSummary().totalSent, calculateSummary().primaryCurrency)}</Text>
           <Text style={styles.summarySubtext}>This month</Text>
         </View>
         
@@ -218,7 +248,7 @@ export default function TransactionsScreen() {
             </View>
             <Text style={styles.summaryTitleModern}>Total Received</Text>
           </View>
-          <Text style={styles.summaryValueModern}>${calculateSummary().totalReceived.toFixed(2)}</Text>
+          <Text style={styles.summaryValueModern}>{formatCurrency(calculateSummary().totalReceived, calculateSummary().primaryCurrency)}</Text>
           <Text style={styles.summarySubtext}>This month</Text>
         </View>
       </View>

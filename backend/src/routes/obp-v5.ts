@@ -270,31 +270,62 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
     console.log(`📊 Found ${transactions.length} transactions in database for user ${userId}`);
     
     // Transform database transactions to frontend Transfer format
-    const transfers = transactions.map((tx: any) => ({
-      id: tx.referenceNumber || tx.id.toString(),
-      sourceAccountId: 'master-account', // Placeholder for required field
-      quoteId: tx.referenceNumber || tx.id.toString(), // Use transaction ID as quote ID
-      status: {
-        status: (tx.status || 'PENDING').toUpperCase() as 'PENDING' | 'PROCESSING' | 'SENT' | 'RECEIVED' | 'COMPLETED' | 'FAILED' | 'CANCELLED',
-        message: `Transaction ${tx.status || 'pending'}`,
-        timestamp: tx.createdAt.toISOString()
-      },
-      sourceAmount: parseFloat(tx.amount.toString()),
-      sourceCurrency: tx.currency || 'EUR',
-      targetAmount: parseFloat(tx.amount.toString()), // Same as source for now
-      targetCurrency: tx.currency || 'EUR', // Same as source for now
-      exchangeRate: 1, // No exchange for same currency
-      fee: tx.totalFee ? parseFloat(tx.totalFee.toString()) : 0,
-      reference: tx.referenceNumber || undefined,
-      description: `${tx.type || 'Transfer'} - ${tx.currency || 'EUR'} ${tx.amount}`,
-      createdAt: tx.createdAt.toISOString(),
-      updatedAt: tx.createdAt.toISOString(), // Use same as created for now
-      completedAt: tx.completedAt?.toISOString() || undefined,
-      recipient: {
-        name: 'Transfer', // Would need to be enhanced with actual recipient data
-        accountNumber: ''
+    const transfers = transactions.map((tx: any) => {
+      // Determine amount sign based on transaction type
+      const amount = parseFloat(tx.amount.toString());
+      let sourceAmount: number;
+      
+      console.log(`🔍 Processing transaction:`, {
+        id: tx.id,
+        type: tx.type,
+        originalAmount: amount,
+        referenceNumber: tx.referenceNumber
+      });
+      
+      switch (tx.type) {
+        case 'OUTBOUND_TRANSFER':
+        case 'WITHDRAWAL':
+        case 'TRANSFER': // Legacy transfer type - assume outbound for current user
+          sourceAmount = -amount; // Negative for money going out
+          break;
+        case 'INBOUND_TRANSFER':
+        case 'DEPOSIT':
+          sourceAmount = amount; // Positive for money coming in
+          break;
+        default:
+          // For other types, assume positive (safe default)
+          sourceAmount = amount;
+          break;
       }
-    }));
+      
+      console.log(`✅ Final amount for transaction ${tx.id}: ${sourceAmount} (type: ${tx.type})`);
+      
+      return {
+        id: tx.referenceNumber || tx.id.toString(),
+        sourceAccountId: 'master-account', // Placeholder for required field
+        quoteId: tx.referenceNumber || tx.id.toString(), // Use transaction ID as quote ID
+        status: {
+          status: (tx.status || 'PENDING').toUpperCase() as 'PENDING' | 'PROCESSING' | 'SENT' | 'RECEIVED' | 'COMPLETED' | 'FAILED' | 'CANCELLED',
+          message: `Transaction ${tx.status || 'pending'}`,
+          timestamp: tx.createdAt.toISOString()
+        },
+        sourceAmount: sourceAmount,
+        sourceCurrency: tx.currency || 'EUR',
+        targetAmount: sourceAmount, // Same as source amount (with correct sign)
+        targetCurrency: tx.currency || 'EUR', // Same as source for now
+        exchangeRate: 1, // No exchange for same currency
+        fee: tx.totalFee ? parseFloat(tx.totalFee.toString()) : 0,
+        reference: tx.referenceNumber || undefined,
+        description: `${tx.type || 'Transfer'} - ${tx.currency || 'EUR'} ${tx.amount}`,
+        createdAt: tx.createdAt.toISOString(),
+        updatedAt: tx.createdAt.toISOString(), // Use same as created for now
+        completedAt: tx.completedAt?.toISOString() || undefined,
+        recipient: {
+          name: 'Transfer', // Would need to be enhanced with actual recipient data
+          accountNumber: ''
+        }
+      };
+    });
     
     console.log(`✅ Found ${transfers.length} transactions for user ${userId}`);
     

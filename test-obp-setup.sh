@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # OBP-API Local Testing Script
-# This script tests your local OBP-API instance and creates sample banking data
+# This script tests your local OBP-API instance and verifies the setup
 
 echo "🏦 Testing OBP-API Local Instance..."
 echo "=================================="
 
-# Your credentials (updated after database reset)
-CONSUMER_KEY="fi4or5r0obmq5mwj2ywpqe52xrazlvxd2myx3y4m"
-CONSUMER_SECRET="ybukbktzvc1lpokpbpetjynnemkq4u1e3edop1rw"
+# Your credentials (current working credentials)
+CONSUMER_KEY="mwtu30rvv5u3q40swprmrlc34llkjgb4xvhawrme"
+CONSUMER_SECRET="bzz1ceaup2wtptptjok5yg22vti5mi5q3ei5ucfc"
 USERNAME="bootstrap"
 PASSWORD="BootstrapPass123!"
 API_URL="http://127.0.0.1:8080"
@@ -52,6 +52,25 @@ if 'banks' in data:
 else:
     print('❌ Error:', data)
 "
+
+    echo -e "\n💰 Step 4: Testing Account Access..."
+    curl -s -X GET "$API_URL/obp/v5.1.0/my/accounts" \
+      -H "Authorization: DirectLogin username=\"$USERNAME\",password=\"$PASSWORD\",consumer_key=\"$CONSUMER_KEY\",token=\"$TOKEN\"" | \
+      python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'accounts' in data:
+    accounts = data['accounts']
+    print(f'✅ Found {len(accounts)} accounts')
+    for account in accounts:
+        balance_info = ''
+        if 'balance' in account:
+            balance_info = f' ({account[\"balance\"][\"currency\"]} {account[\"balance\"][\"amount\"]})'
+        print(f'  - {account[\"id\"]}: {account[\"label\"]}{balance_info}')
+else:
+    print('❌ Error:', data)
+"
+
 else
     echo "❌ Failed to get token. Response: $TOKEN_RESPONSE"
     echo -e "\n🔧 Let's try a different approach..."

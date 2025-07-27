@@ -99,10 +99,21 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       },
 
       loadAccounts: async () => {
+        const { userId } = get();
+        console.log(`🏦 Loading accounts for user: ${userId}`);
         set({ isLoading: true, error: null });
         
         try {
           const response = await bankingService.getAccounts();
+          
+          console.log(`✅ Accounts loaded:`, {
+            accountCount: response.accounts.length,
+            accounts: response.accounts.map(acc => ({
+              id: acc.id,
+              currency: acc.currency,
+              iban: acc.iban
+            }))
+          });
           
           set({
             accounts: response.accounts,
@@ -113,6 +124,12 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           });
         } catch (error) {
           const bankingError = error as BankingError;
+          console.error('❌ Failed to load accounts:', {
+            error: bankingError,
+            message: bankingError.message,
+            statusCode: bankingError.statusCode
+          });
+          
           set({
             isLoading: false,
             error: bankingError.message || 'Failed to load accounts',
@@ -134,18 +151,30 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       },
 
       refreshBalance: async (accountId?: string) => {
-        const { selectedAccount } = get();
+        const { selectedAccount, userId } = get();
         const targetAccountId = accountId || selectedAccount?.id;
         
         if (!targetAccountId) {
+          console.warn('⚠️ Cannot refresh balance: no account ID provided');
           set({ error: 'No account selected' });
           return;
         }
 
-        set({ isLoading: true, error: null });
+        console.log(`🔄 Refreshing balance for account: ${targetAccountId} (user: ${userId})`);
+        
+        // Clear the current balance first to ensure UI updates
+        set({ balance: null, isLoading: true, error: null });
         
         try {
+          console.log(`📡 Making balance API call for account: ${targetAccountId}`);
           const response = await bankingService.getAccountBalance(targetAccountId);
+          
+          console.log(`✅ Balance refresh successful:`, {
+            accountId: targetAccountId,
+            balance: response.balance,
+            amount: response.balance.amount,
+            currency: response.balance.currency
+          });
           
           set({
             balance: response.balance,
@@ -154,10 +183,19 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           });
         } catch (error) {
           const bankingError = error as BankingError;
+          console.error(`❌ Balance refresh failed for account ${targetAccountId}:`, {
+            error: bankingError,
+            message: bankingError.message,
+            statusCode: bankingError.statusCode
+          });
+          
           set({
             isLoading: false,
             error: bankingError.message || 'Failed to refresh balance',
           });
+          
+          // Don't throw the error, just log it
+          console.error('Balance refresh error details:', error);
         }
       },
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { router } from 'expo-router';
 
 export default function CreateAccountScreen() {

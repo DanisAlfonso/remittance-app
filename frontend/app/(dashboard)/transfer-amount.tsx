@@ -205,7 +205,6 @@ export default function TransferAmountScreen() {
       
       // If this is a @username transfer, fetch the user's IBAN first
       if (recipientData.type === 'user' && recipientData.id) {
-        console.log('🔍 Fetching IBAN for @username transfer...');
         const userIbanData = await fetchUserIban(recipientData.id);
         
         // Update recipient data with real IBAN information
@@ -216,13 +215,6 @@ export default function TransferAmountScreen() {
           country: userIbanData.country,
           currency: userIbanData.currency,
         };
-        
-        console.log('✅ IBAN fetched for user:', {
-          username: recipientData.username,
-          holderName: userIbanData.holderName,
-          iban: userIbanData.iban?.slice(-4), // Only log last 4 digits for security
-          country: userIbanData.country,
-        });
       }
       
       // All transfers now go through OBP-API as real bank transfers
@@ -250,7 +242,7 @@ export default function TransferAmountScreen() {
         }
       };
       
-      console.log('💸 Executing real bank transfer via OBP-API...');
+      
       const response = await apiClient.obpPost('/obp/v5.1.0/transaction-requests', transferData, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -259,9 +251,25 @@ export default function TransferAmountScreen() {
         ? `${finalRecipientData.holderName} (@${recipientData.username})`
         : finalRecipientData.holderName;
       
-      console.log('Transfer response:', response);
       
-      const transferResponse = response as { transfer?: { id: string }; message?: string };
+      const transferResponse = response as { 
+        transfer?: { 
+          id: string; 
+          status?: string; 
+          type?: string; 
+          challenge?: Record<string, unknown>; 
+        }; 
+        message?: string;
+        error?: {
+          error_code?: string;
+          error_message?: string;
+        };
+      };
+      
+      // Handle OBP-API error responses
+      if (transferResponse.error) {
+        throw new Error(transferResponse.error.error_message || 'Transfer failed');
+      }
       
       if (!transferResponse.transfer || !transferResponse.transfer.id) {
         throw new Error('Invalid response: transfer data missing');

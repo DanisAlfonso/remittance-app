@@ -91,7 +91,7 @@ export const isBiometricEnabled = async (): Promise<boolean> => {
   try {
     const enabled = await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY);
     return enabled === 'true';
-  } catch (error) {
+  } catch {
     return false;
   }
 };

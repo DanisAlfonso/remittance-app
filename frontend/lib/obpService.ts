@@ -300,8 +300,8 @@ export class OBPService {
       bank_id: string;
       account_id: string;
     };
-    details: any;
-    body: any;
+    details: Record<string, unknown>;
+    body: Record<string, unknown>;
     status: string;
     start_date: string;
     end_date: string;
@@ -319,8 +319,8 @@ export class OBPService {
         bank_id: string;
         account_id: string;
       };
-      details: any;
-      body: any;
+      details: Record<string, unknown>;
+      body: Record<string, unknown>;
       status: string;
       start_date: string;
       end_date: string;

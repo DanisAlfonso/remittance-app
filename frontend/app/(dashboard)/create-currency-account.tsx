@@ -263,10 +263,10 @@ export default function CreateCurrencyAccountScreen() {
             onPress={handleCreateAccount}
             loading={isLoading}
             disabled={!selectedCurrency}
-            style={[
+            style={StyleSheet.flatten([
               styles.createButton,
               !selectedCurrency && styles.createButtonDisabled
-            ]}
+            ])}
             textStyle={styles.createButtonText}
           />
         </View>

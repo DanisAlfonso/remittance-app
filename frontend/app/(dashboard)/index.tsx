@@ -47,7 +47,11 @@ export default function DashboardScreen() {
     
     setIsLoadingTransfers(true);
     try {
-      console.log('🔍 Loading recent transfers with auth token...');
+      console.log('🔍 Loading recent transfers with auth token...', {
+        hasToken: !!token,
+        tokenLength: token?.length || 0,
+        tokenPrefix: token?.substring(0, 20) + '...'
+      });
       
       // Ensure API client has the token
       apiClient.setAuthToken(token);
@@ -101,7 +105,7 @@ export default function DashboardScreen() {
       // Refresh accounts and balance
       await loadAccounts();
       
-      // Refresh balance for selected account
+      // Force refresh balance for selected account (clears cache)
       if (currentAccount) {
         await refreshBalance(currentAccount.id);
       }
@@ -164,22 +168,42 @@ export default function DashboardScreen() {
       
       console.log('✅ Sandbox data imported:', result);
       
-      Alert.alert(
-        'Success!', 
-        `Sandbox data imported successfully!\n\n` +
-        `• ${result.data.total_accounts} test accounts created\n` +
-        `• ${result.data.total_transactions} transactions added\n\n` +
-        `You can now test transfers with funded accounts.`,
-        [
-          {
-            text: 'Refresh Accounts',
-            onPress: () => {
-              loadAccounts();
-              refreshAllData(true);
+      // Handle the new response format for initial deposit simulation
+      if (result.data.message && result.data.deposit) {
+        Alert.alert(
+          '💰 Initial Deposit Complete!', 
+          `${result.data.message}\n\n` +
+          `• Virtual IBAN: ${result.data.virtual_account.iban}\n` +
+          `• Amount: €${result.data.deposit.amount}.00\n` +
+          `• Reference: ${result.data.deposit.reference}\n\n` +
+          `${result.data.instructions}`,
+          [
+            {
+              text: 'Refresh Balance',
+              onPress: () => {
+                loadAccounts();
+                refreshAllData(true);
+              }
             }
-          }
-        ]
-      );
+          ]
+        );
+      } else {
+        // Fallback for old format (master account funding)
+        Alert.alert(
+          'Success!', 
+          `Test data imported successfully!\n\n` +
+          `Your account is now ready for testing transfers.`,
+          [
+            {
+              text: 'Refresh Accounts',
+              onPress: () => {
+                loadAccounts();
+                refreshAllData(true);
+              }
+            }
+          ]
+        );
+      }
     } catch (error) {
       console.error('❌ Sandbox import failed:', error);
       

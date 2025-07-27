@@ -74,7 +74,7 @@ export default function ProfileScreen() {
     initBiometrics();
   }, [user?.email]);
 
-  const showPasswordPrompt = (biometricType: string) => {
+  const showPasswordPrompt = () => {
     return new Promise<string | null>((resolve) => {
       setPasswordInput('');
       setPasswordPromiseResolve(() => resolve);
@@ -116,7 +116,7 @@ export default function ProfileScreen() {
       });
       
       // Check if response has token and user (successful login)
-      return !!(response?.token && response?.user);
+      return !!(response && typeof response === 'object' && 'token' in response && 'user' in response);
     } catch (error) {
       console.error('Password verification failed:', error);
       return false;
@@ -156,7 +156,7 @@ export default function ProfileScreen() {
       
       if (!existingCredentials) {
         // Need to prompt for password and store credentials
-        const password = await showPasswordPrompt(biometricType);
+        const password = await showPasswordPrompt();
         
         if (!password) {
           // User cancelled - revert switch

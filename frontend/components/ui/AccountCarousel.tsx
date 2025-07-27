@@ -16,7 +16,6 @@ import type { BankAccount, AccountBalance } from '../../types/banking';
 
 const { width: screenWidth } = Dimensions.get('window');
 // Perfect edge-to-edge alignment: cards span full screen width with internal padding
-const CARD_PADDING = 16; // Internal card padding for content spacing
 
 interface AccountCarouselProps {
   accounts: BankAccount[];
@@ -235,7 +234,7 @@ export default function AccountCarousel({
         scrollEventThrottle={16}
         decelerationRate="fast"
       >
-        {allItems.map((account, index) => (
+        {allItems.map((account) => (
           <View key={account?.id || 'add-account'} style={styles.cardContainer}>
             {account ? (
               <AccountCard

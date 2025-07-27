@@ -87,7 +87,8 @@ export default function TransactionsScreen() {
     return 'Recipient';
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | undefined) => {
+    if (!status) return '#6b7280'; // Professional gray for undefined/null
     switch (status.toLowerCase()) {
       case 'completed':
         return '#059669'; // Professional green
@@ -104,7 +105,8 @@ export default function TransactionsScreen() {
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string | undefined) => {
+    if (!status) return 'Unknown';
     return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 

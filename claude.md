@@ -55,6 +55,11 @@ This is a **high-quality financial software prototype** with production-grade co
 - **Consumer Secret**: `bzz1ceaup2wtptptjok5yg22vti5mi5q3ei5ucfc`
 - **OBP-API Base URL**: `http://127.0.0.1:8080`
 
+### **OBP-API VERSION REQUIREMENT**
+- **API Version**: `v5.1.0` - ALWAYS use this exact version in all endpoints
+- **Base API Path**: `/obp/v5.1.0/` - NEVER use other versions like v2.1.0, v3.0.0, etc.
+- **All endpoints must use**: `http://127.0.0.1:8080/obp/v5.1.0/...`
+
 ---
 
 ## Project Overview

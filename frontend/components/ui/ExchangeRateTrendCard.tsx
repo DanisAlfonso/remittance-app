@@ -218,7 +218,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
         </View>
 
         {/* Chart */}
-        <View style={styles.chartContainer}>
+        <View style={styles.chartSection}>
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#1E40AF" />
@@ -260,7 +260,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
                   
                   return transformedData;
                 })()}
-                width={screenWidth - 60} // Optimize width for data point display
+                width={screenWidth - 122} // Match the internal margin of other card elements
                 height={200}
                 adjustToWidth={true} // Let chart adjust to show all points
                 
@@ -289,8 +289,8 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 interpolateMissingValues={false}
                 // Remove forced spacing to let chart handle naturally
                 // spacing={50}
-                initialSpacing={10}
-                endSpacing={10}
+                initialSpacing={0}
+                endSpacing={0}
                 
                 // Area fill gradient
                 startFillColor={getTrendColor()}
@@ -344,7 +344,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 xAxisThickness={1}
                 yAxisTextStyle={styles.axisText}
                 yAxisTextNumberOfLines={1}
-                yAxisLabelWidth={50}
+                yAxisLabelWidth={35}
                 
                 // Proper pointerConfig based on official documentation
                 pointerConfig={{
@@ -563,12 +563,8 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 2,
   },
-  chartContainer: {
+  chartSection: {
     marginVertical: 16,
-    borderRadius: 12,
-    backgroundColor: '#FAFBFC',
-    padding: 16,
-    overflow: 'hidden',
     alignItems: 'center',
   },
   chartWrapper: {

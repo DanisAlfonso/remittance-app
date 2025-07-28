@@ -429,7 +429,7 @@ export class OBPApiService {
     new_balance: string;
     status: string;
   }>> {
-    console.log(`💰 [OBP-FUNDING] Starting REAL master account funding: ${amount} EUR`);
+    console.log(`💰 [OBP-FUNDING] Starting REAL EUR master account funding: ${amount} EUR`);
     
     try {
       // Ensure authentication
@@ -439,7 +439,7 @@ export class OBPApiService {
       }
       
       // Step 1: Create transaction request to fund master account
-      console.log('📝 [OBP-FUNDING] Creating transaction request...');
+      console.log('📝 [OBP-FUNDING] Creating EUR transaction request...');
       const transactionRequest = await this.createTransactionRequest({
         from_bank_id: 'EURBANK',
         from_account_id: 'f8ea80af-7e83-4211-bca7-d8fc53094c1c', // EURBANK master account
@@ -451,7 +451,7 @@ export class OBPApiService {
           currency: 'EUR',
           amount: amount.toString()
         },
-        description: 'Master account funding for virtual IBAN system',
+        description: 'EUR Master account funding for virtual IBAN system',
         challenge_type: 'SANDBOX_TAN'
       });
       
@@ -466,7 +466,7 @@ export class OBPApiService {
         throw new Error('No challenge ID received from transaction request');
       }
       
-      console.log(`🔑 [OBP-FUNDING] Completing challenge: ${challengeId}`);
+      console.log(`🔑 [OBP-FUNDING] Completing EUR challenge: ${challengeId}`);
       
       // Step 2: Complete challenge with sandbox answer "123"
       const challengeResult = await this.makeRequest<{
@@ -490,7 +490,7 @@ export class OBPApiService {
       }
       
       const transactionId = challengeResult.data.transaction_ids[0];
-      console.log(`✅ [OBP-FUNDING] Transaction completed: ${transactionId}`);
+      console.log(`✅ [OBP-FUNDING] EUR Transaction completed: ${transactionId}`);
       
       // Step 3: Verify new balance
       const accountResult = await this.makeRequest<{
@@ -499,7 +499,7 @@ export class OBPApiService {
       
       const newBalance = accountResult.success ? accountResult.data?.balance.amount : 'unknown';
       
-      console.log(`🎉 [OBP-FUNDING] Master account funded successfully! New balance: ${newBalance} EUR`);
+      console.log(`🎉 [OBP-FUNDING] EUR Master account funded successfully! New balance: ${newBalance} EUR`);
       
       return {
         success: true,
@@ -514,10 +514,10 @@ export class OBPApiService {
       };
       
     } catch (error) {
-      console.error('❌ [OBP-FUNDING] Master account funding failed:', error);
+      console.error('❌ [OBP-FUNDING] EUR Master account funding failed:', error);
       
       // Fallback to internal funding for development
-      console.log('🔄 [OBP-FUNDING] Falling back to internal funding...');
+      console.log('🔄 [OBP-FUNDING] Falling back to internal EUR funding...');
       const fallbackResult = await this.fallbackInternalFunding();
       return fallbackResult as BankingApiResponse<{
         transaction_id: string;
@@ -530,13 +530,132 @@ export class OBPApiService {
   }
 
   /**
-   * Import Test Data - Simulate initial €100 deposit like Wise
+   * Fund HNLBANK master account using transaction request method
    * 
-   * This simulates the Wise-like flow where users need to deposit money to get started.
-   * Creates virtual account for user and simulates incoming transfer of €100.
+   * This funds the HNL master account for Lempira transactions.
+   * Uses OBP-API transaction request with challenge completion.
+   * 
+   * Method:
+   * 1. Create SANDBOX_TAN transaction request (self-transfer)
+   * 2. Complete challenge with answer "123"
+   * 3. Transaction completes and adds balance to HNL master account
    */
-  async importSandboxData(userId?: string): Promise<BankingApiResponse<any>> {
-    console.log(`💰 [IMPORT-TEST-DATA] Starting initial deposit simulation for user: ${userId}`);
+  async fundHNLMasterAccount(amount: number = 130000): Promise<BankingApiResponse<{
+    transaction_id: string;
+    amount: number;
+    currency: string;
+    new_balance: string;
+    status: string;
+  }>> {
+    console.log(`💰 [OBP-FUNDING] Starting REAL HNL master account funding: ${amount} HNL`);
+    
+    try {
+      // Ensure authentication
+      const authCheck = await this.ensureValidToken();
+      if (!authCheck) {
+        throw new Error('OBP-API authentication failed');
+      }
+      
+      // Step 1: Create transaction request to fund HNL master account
+      console.log('📝 [OBP-FUNDING] Creating HNL transaction request...');
+      const transactionRequest = await this.createTransactionRequest({
+        from_bank_id: 'HNLBANK',
+        from_account_id: '0ce45ba7-7cde-4999-9f94-a0d087a2d516', // HNLBANK master account
+        to: {
+          bank_id: 'HNLBANK',
+          account_id: '0ce45ba7-7cde-4999-9f94-a0d087a2d516' // Self-transfer to add funds
+        },
+        value: {
+          currency: 'HNL',
+          amount: amount.toString()
+        },
+        description: 'HNL Master account funding for virtual IBAN system',
+        challenge_type: 'SANDBOX_TAN'
+      });
+      
+      if (!transactionRequest.success || !transactionRequest.data) {
+        throw new Error(`HNL Transaction request failed: ${transactionRequest.error?.error_description}`);
+      }
+      
+      const requestId = transactionRequest.data.id;
+      const challengeId = transactionRequest.data.challenge?.id;
+      
+      if (!challengeId) {
+        throw new Error('No challenge ID received from HNL transaction request');
+      }
+      
+      console.log(`🔑 [OBP-FUNDING] Completing HNL challenge: ${challengeId}`);
+      
+      // Step 2: Complete challenge with sandbox answer "123"
+      const challengeResult = await this.makeRequest<{
+        id: string;
+        status: string;
+        transaction_ids: string[];
+      }>(`/obp/v5.1.0/banks/HNLBANK/accounts/0ce45ba7-7cde-4999-9f94-a0d087a2d516/owner/transaction-request-types/SANDBOX_TAN/transaction-requests/${requestId}/challenge`, {
+        method: 'POST',
+        body: JSON.stringify({
+          id: challengeId,
+          answer: '123' // Sandbox challenge answer
+        })
+      });
+      
+      if (!challengeResult.success || !challengeResult.data) {
+        throw new Error(`HNL Challenge completion failed: ${challengeResult.error?.error_description}`);
+      }
+      
+      if (challengeResult.data.status !== 'COMPLETED') {
+        throw new Error(`HNL Transaction not completed. Status: ${challengeResult.data.status}`);
+      }
+      
+      const transactionId = challengeResult.data.transaction_ids[0];
+      console.log(`✅ [OBP-FUNDING] HNL Transaction completed: ${transactionId}`);
+      
+      // Step 3: Verify new balance
+      const accountResult = await this.makeRequest<{
+        balance: { currency: string; amount: string };
+      }>('/obp/v5.1.0/banks/HNLBANK/accounts/0ce45ba7-7cde-4999-9f94-a0d087a2d516/owner/account');
+      
+      const newBalance = accountResult.success ? accountResult.data?.balance.amount : 'unknown';
+      
+      console.log(`🎉 [OBP-FUNDING] HNL Master account funded successfully! New balance: ${newBalance} HNL`);
+      
+      return {
+        success: true,
+        data: {
+          transaction_id: transactionId,
+          amount: amount,
+          currency: 'HNL',
+          new_balance: newBalance || 'unknown',
+          status: 'COMPLETED'
+        },
+        statusCode: 201
+      };
+      
+    } catch (error) {
+      console.error('❌ [OBP-FUNDING] HNL Master account funding failed:', error);
+      
+      // Fallback to internal funding for development
+      console.log('🔄 [OBP-FUNDING] Falling back to internal HNL funding...');
+      const fallbackResult = await this.fallbackInternalFunding();
+      return fallbackResult as BankingApiResponse<{
+        transaction_id: string;
+        amount: number;
+        currency: string;
+        new_balance: string;
+        status: string;
+      }>;
+    }
+  }
+
+  /**
+   * Import Test Data - Simulate initial deposit for specific currency
+   * 
+   * This simulates the flow where users need to deposit money to get started.
+   * Creates virtual account for user and simulates incoming transfer.
+   * Now supports currency-specific routing to the correct master account.
+   */
+  async importSandboxData(userId?: string, currency: string = 'EUR'): Promise<BankingApiResponse<any>> {
+    console.log(`💰 [IMPORT-TEST-DATA] Starting initial deposit simulation for user: ${userId} (${currency})`);
     
     if (!userId) {
       console.error('❌ [IMPORT-TEST-DATA] No user ID provided');
@@ -549,21 +668,34 @@ export class OBPApiService {
         statusCode: 400
       };
     }
+
+    // Validate supported currencies
+    if (!['EUR', 'HNL'].includes(currency)) {
+      console.error(`❌ [IMPORT-TEST-DATA] Unsupported currency: ${currency}`);
+      return {
+        success: false,
+        error: {
+          error: 'UNSUPPORTED_CURRENCY',
+          error_description: `Currency ${currency} is not supported. Supported currencies: EUR, HNL`
+        },
+        statusCode: 400
+      };
+    }
     
     try {
       // Import master account banking service
       const { masterAccountBanking } = await import('../services/master-account-banking.js');
       
-      console.log(`🏦 [IMPORT-TEST-DATA] Step 1: Ensuring user has virtual EUR account...`);
+      console.log(`🏦 [IMPORT-TEST-DATA] Step 1: Ensuring user has virtual ${currency} account...`);
       
-      // Step 1: Ensure user has virtual EUR account (check first, create if needed)
-      console.log(`🔍 [IMPORT-TEST-DATA] Checking if user already has virtual EUR account...`);
+      // Step 1: Ensure user has virtual account for the specified currency (check first, create if needed)
+      console.log(`🔍 [IMPORT-TEST-DATA] Checking if user already has virtual ${currency} account...`);
       
       const { prisma } = await import('../config/database.js');
       let existingAccount = await prisma.bankAccount.findFirst({
         where: {
           userId,
-          currency: 'EUR',
+          currency,
           accountType: 'virtual_remittance',
           status: 'ACTIVE'
         },
@@ -573,67 +705,76 @@ export class OBPApiService {
       let virtualAccount;
       
       if (existingAccount) {
-        console.log(`📋 [IMPORT-TEST-DATA] Found existing EUR account: ${existingAccount.iban}`);
+        console.log(`📋 [IMPORT-TEST-DATA] Found existing ${currency} account: ${existingAccount.iban}`);
         virtualAccount = {
           userId,
           virtualIBAN: existingAccount.iban!,
-          currency: 'EUR' as const,
+          currency: currency as 'EUR' | 'HNL',
           balance: parseFloat(existingAccount.lastBalance?.toString() || '0'),
           masterAccountReference: existingAccount.obpAccountId || '',
           status: 'ACTIVE' as const,
-          bic: existingAccount.bic || 'REMTES21XXX',
-          bankName: existingAccount.bankName || 'Remittance Test Bank',
+          bic: existingAccount.bic || (currency === 'EUR' ? 'REMTES21XXX' : 'REMTES01XXX'),
+          bankName: existingAccount.bankName || (currency === 'EUR' ? 'Euro Remittance Bank' : 'Lempira Remittance Bank'),
           accountNumber: existingAccount.accountNumber || undefined,
-          country: existingAccount.country || 'ES'
+          country: existingAccount.country || (currency === 'EUR' ? 'ES' : 'HN')
         };
       } else {
-        console.log(`🏦 [IMPORT-TEST-DATA] No existing account found, creating new virtual EUR account...`);
-        virtualAccount = await masterAccountBanking.createVirtualAccount(userId, 'EUR', 'EUR Remittance Account');
-        console.log(`✅ [IMPORT-TEST-DATA] Virtual EUR account created: ${virtualAccount.virtualIBAN}`);
+        console.log(`🏦 [IMPORT-TEST-DATA] No existing account found, creating new virtual ${currency} account...`);
+        virtualAccount = await masterAccountBanking.createVirtualAccount(userId, currency as 'EUR' | 'HNL', `${currency} Remittance Account`);
+        console.log(`✅ [IMPORT-TEST-DATA] Virtual ${currency} account created: ${virtualAccount.virtualIBAN}`);
       }
       
-      console.log(`💸 [IMPORT-TEST-DATA] Step 2: Simulating external €100 deposit to master account...`);
+      const depositAmount = currency === 'EUR' ? 100 : 2600; // €100 or L.2600 (rough equivalent)
+      const currencySymbol = currency === 'EUR' ? '€' : 'L.';
       
-      // Step 2a: First, simulate external money coming into the master account
-      // This represents someone sending €100 from outside our system to the user's virtual IBAN
-      console.log(`🏦 [IMPORT-TEST-DATA] Crediting €100 to EURBANK master account...`);
+      console.log(`💸 [IMPORT-TEST-DATA] Step 2: Simulating external ${currencySymbol}${depositAmount} deposit to ${currency} master account...`);
       
-      const masterFundingResult = await this.fundMasterAccount(100); // Add €100 to master account
+      // Step 2a: First, simulate external money coming into the appropriate master account
+      // This represents someone sending money from outside our system to the user's virtual IBAN
+      console.log(`🏦 [IMPORT-TEST-DATA] Crediting ${currencySymbol}${depositAmount} to ${currency} master account...`);
+      
+      let masterFundingResult;
+      if (currency === 'EUR') {
+        masterFundingResult = await this.fundMasterAccount(depositAmount); // Add to EUR master account
+      } else {
+        // For HNL, we need to fund the HNL master account
+        masterFundingResult = await this.fundHNLMasterAccount(depositAmount);
+      }
       
       if (!masterFundingResult.success) {
-        throw new Error(`Failed to credit master account: ${masterFundingResult.error?.error_description}`);
+        throw new Error(`Failed to credit ${currency} master account: ${masterFundingResult.error?.error_description}`);
       }
       
-      console.log(`✅ [IMPORT-TEST-DATA] Master account credited. New balance: ${masterFundingResult.data?.new_balance} EUR`);
+      console.log(`✅ [IMPORT-TEST-DATA] ${currency} master account credited. New balance: ${masterFundingResult.data?.new_balance} ${currency}`);
       
       // Step 2b: Now process the inbound transfer to credit the user's virtual balance
       console.log(`💰 [IMPORT-TEST-DATA] Crediting user's virtual balance...`);
       
       const inboundResult = await masterAccountBanking.processInboundTransfer({
         virtualIBAN: virtualAccount.virtualIBAN,
-        amount: 100,
-        currency: 'EUR',
+        amount: depositAmount,
+        currency: currency as 'EUR' | 'HNL',
         senderDetails: {
           name: 'External Bank Transfer',
-          reference: 'Initial deposit via Import Test Data'
+          reference: `Initial ${currency} deposit via Import Test Data`
         }
       });
       
       console.log(`✅ [IMPORT-TEST-DATA] Inbound transfer completed: ${inboundResult.referenceNumber}`);
-      console.log(`🎉 [IMPORT-TEST-DATA] User now has €100.00 to test the system!`);
+      console.log(`🎉 [IMPORT-TEST-DATA] User now has ${currencySymbol}${depositAmount}.00 to test the system!`);
       
       return {
         success: true,
         data: {
-          message: 'External deposit of €100.00 completed successfully',
+          message: `External deposit of ${currencySymbol}${depositAmount}.00 completed successfully`,
           virtual_account: {
             iban: virtualAccount.virtualIBAN,
             bic: virtualAccount.bic,
             bank_name: virtualAccount.bankName
           },
           deposit: {
-            amount: 100,
-            currency: 'EUR',
+            amount: depositAmount,
+            currency: currency,
             reference: inboundResult.referenceNumber,
             status: 'COMPLETED'
           },
@@ -641,17 +782,21 @@ export class OBPApiService {
             new_balance: masterFundingResult.data?.new_balance || 'Unknown',
             transaction_id: masterFundingResult.data?.transaction_id || 'N/A'
           },
-          instructions: 'External funds received! Your virtual IBAN now has €100.00 and the master account has been credited accordingly.'
+          instructions: `External funds received! Your virtual IBAN now has ${currencySymbol}${depositAmount}.00 and the ${currency} master account has been credited accordingly.`
         },
         statusCode: 201
       };
       
     } catch (error) {
-      console.error('❌ [IMPORT-TEST-DATA] Failed to simulate initial deposit:', error);
+      console.error(`❌ [IMPORT-TEST-DATA] Failed to simulate initial ${currency} deposit:`, error);
       
       // Fallback to master account funding if user simulation fails
-      console.log('🔄 [IMPORT-TEST-DATA] Falling back to master account funding...');
-      return this.fundMasterAccount(5000);
+      console.log(`🔄 [IMPORT-TEST-DATA] Falling back to ${currency} master account funding...`);
+      if (currency === 'EUR') {
+        return this.fundMasterAccount(5000);
+      } else {
+        return this.fundHNLMasterAccount(130000); // L.130,000 equivalent fallback
+      }
     }
   }
 
@@ -985,6 +1130,181 @@ export class OBPApiService {
         success: false,
         features,
         error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Get comprehensive banks and master account status
+   * This provides a detailed overview of all banks and their master account balances
+   */
+  async getBanksAndMasterAccountStatus(): Promise<BankingApiResponse<{
+    banks: Array<{
+      id: string;
+      name: string;
+      accounts: Array<{
+        id: string;
+        label: string;
+        currency: string;
+        balance: string;
+        is_master_account: boolean;
+      }>;
+    }>;
+    master_accounts: {
+      EUR: {
+        bank_id: string;
+        account_id: string;
+        balance: string;
+        status: string;
+      };
+      HNL: {
+        bank_id: string;
+        account_id: string;
+        balance: string;
+        status: string;
+      };
+    };
+    summary: {
+      total_banks: number;
+      total_master_accounts: number;
+      currencies_supported: string[];
+    };
+  }>> {
+    console.log('🏦 [BANKS-STATUS] Getting comprehensive banks and master account status...');
+    
+    try {
+      // Step 1: Get all banks
+      const banksResult = await this.getBanks();
+      if (!banksResult.success || !banksResult.data) {
+        throw new Error('Failed to get banks from OBP-API');
+      }
+      
+      console.log(`🏦 [BANKS-STATUS] Found ${banksResult.data.length} banks`);
+      
+      const banksWithAccounts = [];
+      const masterAccountStatus = {
+        EUR: { bank_id: 'EURBANK', account_id: 'f8ea80af-7e83-4211-bca7-d8fc53094c1c', balance: 'unknown', status: 'unknown' },
+        HNL: { bank_id: 'HNLBANK', account_id: '0ce45ba7-7cde-4999-9f94-a0d087a2d516', balance: 'unknown', status: 'unknown' }
+      };
+      
+      // Step 2: For each bank, get accounts and check for master accounts
+      for (const bank of banksResult.data) {
+        console.log(`🔍 [BANKS-STATUS] Checking accounts for bank: ${bank.id} (${bank.full_name})`);
+        
+        try {
+          // Get accounts for this bank
+          const accountsResult = await this.makeRequest<{
+            accounts: Array<{
+              id: string;
+              label: string;
+              balance: { currency: string; amount: string };
+            }>;
+          }>(`/obp/v5.1.0/banks/${bank.id}/accounts`);
+          
+          const bankAccounts = [];
+          
+          if (accountsResult.success && accountsResult.data?.accounts) {
+            for (const account of accountsResult.data.accounts) {
+              const isMasterAccount = 
+                (bank.id === 'EURBANK' && account.id === 'f8ea80af-7e83-4211-bca7-d8fc53094c1c') ||
+                (bank.id === 'HNLBANK' && account.id === '0ce45ba7-7cde-4999-9f94-a0d087a2d516');
+              
+              bankAccounts.push({
+                id: account.id,
+                label: account.label,
+                currency: account.balance.currency,
+                balance: account.balance.amount,
+                is_master_account: isMasterAccount
+              });
+              
+              // Update master account status if this is a master account
+              if (isMasterAccount) {
+                if (bank.id === 'EURBANK') {
+                  masterAccountStatus.EUR.balance = account.balance.amount;
+                  masterAccountStatus.EUR.status = 'active';
+                } else if (bank.id === 'HNLBANK') {
+                  masterAccountStatus.HNL.balance = account.balance.amount;
+                  masterAccountStatus.HNL.status = 'active';
+                }
+                console.log(`💰 [BANKS-STATUS] Found master account: ${bank.id}/${account.id} - Balance: ${account.balance.amount} ${account.balance.currency}`);
+              }
+            }
+          }
+          
+          banksWithAccounts.push({
+            id: bank.id,
+            name: bank.full_name,
+            accounts: bankAccounts
+          });
+          
+        } catch (bankError) {
+          console.error(`❌ [BANKS-STATUS] Failed to get accounts for bank ${bank.id}:`, bankError);
+          banksWithAccounts.push({
+            id: bank.id,
+            name: bank.full_name,
+            accounts: []
+          });
+        }
+      }
+      
+      // Step 3: Try to get detailed balance for master accounts directly
+      console.log('🔍 [BANKS-STATUS] Getting detailed master account balances...');
+      
+      try {
+        const eurBalance = await this.makeRequest<{
+          balance: { currency: string; amount: string };
+        }>('/obp/v5.1.0/banks/EURBANK/accounts/f8ea80af-7e83-4211-bca7-d8fc53094c1c/owner/account');
+        
+        if (eurBalance.success && eurBalance.data?.balance) {
+          masterAccountStatus.EUR.balance = eurBalance.data.balance.amount;
+          masterAccountStatus.EUR.status = 'accessible';
+          console.log(`💰 [BANKS-STATUS] EUR Master Account Balance: ${eurBalance.data.balance.amount} EUR`);
+        }
+      } catch (eurError) {
+        console.error('❌ [BANKS-STATUS] Failed to get EUR master account balance:', eurError);
+      }
+      
+      try {
+        const hnlBalance = await this.makeRequest<{
+          balance: { currency: string; amount: string };
+        }>('/obp/v5.1.0/banks/HNLBANK/accounts/0ce45ba7-7cde-4999-9f94-a0d087a2d516/owner/account');
+        
+        if (hnlBalance.success && hnlBalance.data?.balance) {
+          masterAccountStatus.HNL.balance = hnlBalance.data.balance.amount;
+          masterAccountStatus.HNL.status = 'accessible';
+          console.log(`💰 [BANKS-STATUS] HNL Master Account Balance: ${hnlBalance.data.balance.amount} HNL`);
+        }
+      } catch (hnlError) {
+        console.error('❌ [BANKS-STATUS] Failed to get HNL master account balance:', hnlError);
+      }
+      
+      const summary = {
+        total_banks: banksWithAccounts.length,
+        total_master_accounts: Object.values(masterAccountStatus).filter(ma => ma.status !== 'unknown').length,
+        currencies_supported: ['EUR', 'HNL']
+      };
+      
+      console.log('✅ [BANKS-STATUS] Banks and master account status retrieved successfully');
+      
+      return {
+        success: true,
+        data: {
+          banks: banksWithAccounts,
+          master_accounts: masterAccountStatus,
+          summary
+        },
+        statusCode: 200
+      };
+      
+    } catch (error) {
+      console.error('❌ [BANKS-STATUS] Failed to get banks and master account status:', error);
+      return {
+        success: false,
+        error: {
+          error: 'BANKS_STATUS_ERROR',
+          error_description: `Failed to get banks status: ${error instanceof Error ? error.message : 'Unknown error'}`
+        },
+        statusCode: 500
       };
     }
   }

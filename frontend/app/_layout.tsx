@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../lib/auth';
 import { apiClient } from '../lib/api';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -26,19 +27,21 @@ export default function RootLayout() {
   }, [token]);
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            animation: 'slide_from_right',
-          }}
-        >
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="auto" translucent={true} />
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: 'slide_from_right',
+            }}
+          >
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
+          </Stack>
+          <StatusBar style="auto" translucent={true} />
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

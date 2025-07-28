@@ -805,10 +805,12 @@ const importSandboxDataHandler: RequestHandler = async (req: AuthRequest, res: R
   try {
     const userId = req.user?.id;
     const userEmail = req.user?.email;
+    const { currency } = req.body; // Extract currency from request body
     
     console.log(`🚀 [IMPORT] Import Test Data request received`);
     console.log(`👤 [IMPORT] User ID: ${userId}`);
     console.log(`📧 [IMPORT] User Email: ${userEmail}`);
+    console.log(`💰 [IMPORT] Target Currency: ${currency || 'EUR (default)'}`);
     
     if (!userId) {
       console.error('❌ [IMPORT] Authentication failed - no user ID');
@@ -821,12 +823,12 @@ const importSandboxDataHandler: RequestHandler = async (req: AuthRequest, res: R
       return;
     }
 
-    console.log(`📦 [IMPORT] Starting sandbox data import via OBP-API for user ${userId}...`);
+    console.log(`📦 [IMPORT] Starting sandbox data import via OBP-API for user ${userId} (${currency || 'EUR'})...`);
     
     try {
-      // Import sandbox data using OBP service with authenticated user ID
-      console.log(`🔄 [IMPORT] Calling obpApiService.importSandboxData(${userId})...`);
-      const result = await obpApiService.importSandboxData(userId);
+      // Import sandbox data using OBP service with authenticated user ID and currency
+      console.log(`🔄 [IMPORT] Calling obpApiService.importSandboxData(${userId}, ${currency || 'EUR'})...`);
+      const result = await obpApiService.importSandboxData(userId, currency);
       
       console.log(`📊 [IMPORT] OBP API result:`, {
         success: result.success,
@@ -986,6 +988,55 @@ const testConnectivityHandler: RequestHandler = async (req: AuthRequest, res: Re
 
 // Debug endpoint for testing
 router.get('/test-connectivity', testConnectivityHandler);
+
+/**
+ * GET /obp/v5.1.0/banks-status
+ * Get comprehensive banks and master account status (Debug endpoint)
+ */
+const getBanksStatusHandler: RequestHandler = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      res.status(401).json({
+        error: {
+          error_code: 'OBP-20001',
+          error_message: 'User not logged in. Authentication via OAuth/Direct Login required.'
+        }
+      });
+      return;
+    }
+
+    console.log('🏦 Getting comprehensive banks and master account status...');
+    
+    // Get banks and master account status
+    const result = await obpApiService.getBanksAndMasterAccountStatus();
+    
+    if (result.success) {
+      res.json({
+        banks_status: result.data,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(result.statusCode || 500).json({
+        error: {
+          error_code: 'OBP-50000',
+          error_message: result.error?.error_description || 'Failed to get banks status'
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Banks status error:', error);
+    res.status(500).json({
+      error: {
+        error_code: 'OBP-50000',
+        error_message: 'Banks status check failed'
+      }
+    });
+  }
+};
+
+router.get('/banks-status', getBanksStatusHandler);
 
 /**
  * GET /obp/v5.1.0/debug/recent-transfers

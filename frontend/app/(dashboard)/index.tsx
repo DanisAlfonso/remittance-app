@@ -12,6 +12,7 @@ import { apiClient } from '../../lib/api';
 import { obpService } from '../../lib/obpService';
 import ProfileCircle from '../../components/ui/ProfileCircle';
 import AccountCarousel from '../../components/ui/AccountCarousel';
+import { ExchangeRateTrendCard } from '../../components/ui/ExchangeRateTrendCard';
 
 
 export default function DashboardScreen() {
@@ -159,22 +160,28 @@ export default function DashboardScreen() {
       return;
     }
 
+    if (!selectedAccount) {
+      Alert.alert('Error', 'Please select an account first');
+      return;
+    }
+
     setIsImportingSandbox(true);
     try {
-      console.log('📦 Importing sandbox data for testing...');
+      console.log(`📦 Importing sandbox data for ${selectedAccount.currency} account...`);
       
-      // Import sandbox data with predefined accounts and balances
-      const result = await obpService.importSandboxData();
+      // Import sandbox data for the specific currency of the selected account
+      const result = await obpService.importSandboxData(selectedAccount.currency);
       
       console.log('✅ Sandbox data imported:', result);
       
       // Handle the new response format for initial deposit simulation
       if (result.data.message && result.data.deposit) {
+        const currencySymbol = selectedAccount.currency === 'EUR' ? '€' : 'L.';
         Alert.alert(
-          '💰 Initial Deposit Complete!', 
+          `💰 ${selectedAccount.currency} Deposit Complete!`, 
           `${result.data.message}\n\n` +
           `• Virtual IBAN: ${result.data.virtual_account.iban}\n` +
-          `• Amount: €${result.data.deposit.amount}.00\n` +
+          `• Amount: ${currencySymbol}${result.data.deposit.amount}.00\n` +
           `• Reference: ${result.data.deposit.reference}\n\n` +
           `${result.data.instructions}`,
           [
@@ -191,7 +198,7 @@ export default function DashboardScreen() {
         // Fallback for old format (master account funding)
         Alert.alert(
           'Success!', 
-          `Test data imported successfully!\n\n` +
+          `Test data imported successfully for ${selectedAccount.currency} account!\n\n` +
           `Your account is now ready for testing transfers.`,
           [
             {
@@ -477,8 +484,8 @@ export default function DashboardScreen() {
           </View>
         )}
 
-
-
+        {/* Exchange Rate Trend Card */}
+        <ExchangeRateTrendCard />
 
         <View style={styles.modernSection}>
           <View style={styles.sectionHeaderModern}>

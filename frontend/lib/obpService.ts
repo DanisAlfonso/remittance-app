@@ -140,7 +140,7 @@ export class OBPService {
    * Import sandbox data with predefined accounts and balances (Superuser only)
    * Following OBP-API v5.1.0 sandbox data import specification
    */
-  async importSandboxData(): Promise<{
+  async importSandboxData(currency?: string): Promise<{
     message: string;
     data: {
       banks: Array<{
@@ -165,7 +165,7 @@ export class OBPService {
         total_accounts: number;
         total_transactions: number;
       };
-    }>('/obp/v5.1.0/sandbox/data-import', {});
+    }>('/obp/v5.1.0/sandbox/data-import', currency ? { currency } : {});
     return response;
   }
 

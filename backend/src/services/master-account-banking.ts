@@ -23,10 +23,10 @@ const MASTER_ACCOUNTS = {
     country: 'ES'
   },
   HNL: {
-    bankId: 'HNLBANK', 
-    accountId: '0ce45ba7-7cde-4999-9f94-a0d087a2d516', // Real OBP account ID
-    iban: 'HN12345678901234567890', // Example Honduran IBAN format
-    bic: 'CATLBK1XXXX',
+    bankId: 'HNLBANK', // Real HNLBANK with HNL account
+    accountId: '86563464-f391-4b9f-ab71-fd25385ab466', // Real HNLBANK account ID
+    iban: 'HN5012345678900394750000', // Real HNLBANK IBAN
+    bic: 'CATLBK1XXXX', // HNLBANK BIC
     currency: 'HNL',
     country: 'HN'
   }
@@ -441,6 +441,8 @@ export class MasterAccountBankingService {
             providerReference: `MASTER_ACCOUNT_FUNDING_${masterConfig.bankId}_${masterConfig.accountId}`
           }
         });
+        
+        console.log(`✅ Funded ${currency} account via master account ${masterConfig.bankId}/${masterConfig.accountId}`);
         
         
       } catch (error) {

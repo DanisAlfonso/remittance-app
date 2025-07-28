@@ -560,10 +560,10 @@ export class OBPApiService {
       console.log('📝 [OBP-FUNDING] Creating HNL transaction request...');
       const transactionRequest = await this.createTransactionRequest({
         from_bank_id: 'HNLBANK',
-        from_account_id: '0ce45ba7-7cde-4999-9f94-a0d087a2d516', // HNLBANK master account
+        from_account_id: '86563464-f391-4b9f-ab71-fd25385ab466', // HNLBANK master account
         to: {
           bank_id: 'HNLBANK',
-          account_id: '0ce45ba7-7cde-4999-9f94-a0d087a2d516' // Self-transfer to add funds
+          account_id: '86563464-f391-4b9f-ab71-fd25385ab466' // Self-transfer to add funds
         },
         value: {
           currency: 'HNL',
@@ -591,7 +591,7 @@ export class OBPApiService {
         id: string;
         status: string;
         transaction_ids: string[];
-      }>(`/obp/v5.1.0/banks/HNLBANK/accounts/0ce45ba7-7cde-4999-9f94-a0d087a2d516/owner/transaction-request-types/SANDBOX_TAN/transaction-requests/${requestId}/challenge`, {
+      }>(`/obp/v5.1.0/banks/HNLBANK/accounts/86563464-f391-4b9f-ab71-fd25385ab466/owner/transaction-request-types/SANDBOX_TAN/transaction-requests/${requestId}/challenge`, {
         method: 'POST',
         body: JSON.stringify({
           id: challengeId,
@@ -613,7 +613,7 @@ export class OBPApiService {
       // Step 3: Verify new balance
       const accountResult = await this.makeRequest<{
         balance: { currency: string; amount: string };
-      }>('/obp/v5.1.0/banks/HNLBANK/accounts/0ce45ba7-7cde-4999-9f94-a0d087a2d516/owner/account');
+      }>('/obp/v5.1.0/banks/HNLBANK/accounts/86563464-f391-4b9f-ab71-fd25385ab466/owner/account');
       
       const newBalance = accountResult.success ? accountResult.data?.balance.amount : 'unknown';
       
@@ -1184,7 +1184,7 @@ export class OBPApiService {
       const banksWithAccounts = [];
       const masterAccountStatus = {
         EUR: { bank_id: 'EURBANK', account_id: 'f8ea80af-7e83-4211-bca7-d8fc53094c1c', balance: 'unknown', status: 'unknown' },
-        HNL: { bank_id: 'HNLBANK', account_id: '0ce45ba7-7cde-4999-9f94-a0d087a2d516', balance: 'unknown', status: 'unknown' }
+        HNL: { bank_id: 'HNLBANK', account_id: '86563464-f391-4b9f-ab71-fd25385ab466', balance: 'unknown', status: 'unknown' }
       };
       
       // Step 2: For each bank, get accounts and check for master accounts
@@ -1207,7 +1207,7 @@ export class OBPApiService {
             for (const account of accountsResult.data.accounts) {
               const isMasterAccount = 
                 (bank.id === 'EURBANK' && account.id === 'f8ea80af-7e83-4211-bca7-d8fc53094c1c') ||
-                (bank.id === 'HNLBANK' && account.id === '0ce45ba7-7cde-4999-9f94-a0d087a2d516');
+                (bank.id === 'HNLBANK' && account.id === '86563464-f391-4b9f-ab71-fd25385ab466');
               
               bankAccounts.push({
                 id: account.id,
@@ -1267,7 +1267,7 @@ export class OBPApiService {
       try {
         const hnlBalance = await this.makeRequest<{
           balance: { currency: string; amount: string };
-        }>('/obp/v5.1.0/banks/HNLBANK/accounts/0ce45ba7-7cde-4999-9f94-a0d087a2d516/owner/account');
+        }>('/obp/v5.1.0/banks/HNLBANK/accounts/86563464-f391-4b9f-ab71-fd25385ab466/owner/account');
         
         if (hnlBalance.success && hnlBalance.data?.balance) {
           masterAccountStatus.HNL.balance = hnlBalance.data.balance.amount;

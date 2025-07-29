@@ -270,7 +270,7 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
     console.log(`📊 Found ${transactions.length} transactions in database for user ${userId}`);
     
     // Transform database transactions to frontend Transfer format
-    const transfers = transactions.map((tx: any) => {
+    const transfers = transactions.map((tx) => {
       // Determine amount sign based on transaction type
       const amount = parseFloat(tx.amount.toString());
       let sourceAmount: number;
@@ -1090,8 +1090,8 @@ const getRecentTransfersHandler: RequestHandler = async (req: AuthRequest, res: 
         status: transfer.status,
         type: transfer.type,
         reference: transfer.reference,
-        from_user_id: (transfer as any).fromUserId,
-        to_user_id: (transfer as any).toUserId,
+        from_user_id: (transfer as unknown as { fromUserId: string }).fromUserId,
+        to_user_id: (transfer as unknown as { toUserId: string }).toUserId,
         to_iban: transfer.recipientIban,
         created_at: transfer.createdAt
       })),
@@ -1323,7 +1323,7 @@ const getTransferHistoryHandler: RequestHandler = async (req: AuthRequest, res: 
       transactions_by_user: Array.from(transactionsByUser.values()).map(userGroup => ({
         user: userGroup.user,
         transaction_count: userGroup.transactions.length,
-        transactions: userGroup.transactions.map((t: any) => ({
+        transactions: userGroup.transactions.map((t: { type: string; status: string; amount: unknown; currency: string; createdAt: Date; referenceNumber: string | null }) => ({
           type: t.type,
           status: t.status,
           amount: t.amount,

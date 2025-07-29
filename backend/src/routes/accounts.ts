@@ -157,7 +157,7 @@ const getTransactionHistoryHandler: RequestHandler = async (req: AuthRequest, re
     
     res.json({
       message: 'Transaction history retrieved successfully',
-      transactions: transactions.map((tx: any) => ({
+      transactions: transactions.map((tx) => ({
         id: tx.id,
         type: tx.type,
         status: tx.status,

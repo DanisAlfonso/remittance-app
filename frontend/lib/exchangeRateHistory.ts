@@ -62,8 +62,8 @@ export class ExchangeRateHistoryService {
     }
     
     try {
-      const rates: HistoricalRateData[] = [];
-      const today = new Date();
+      // const rates: HistoricalRateData[] = []; // Unused
+      // const today = new Date(); // Unused
       
       // Generate fast simulated data without API calls for performance
       console.log(`⚡ Generating ${days} days of optimized simulated data...`);
@@ -103,7 +103,7 @@ export class ExchangeRateHistoryService {
    */
   private async generateSimulatedData(days: number, providedBaseRate?: number): Promise<HistoricalResponse> {
     try {
-      let baseRate = providedBaseRate || 30.8; // Use provided rate or fallback
+      const baseRate = providedBaseRate || 30.8; // Use provided rate or fallback
       
       // Skip API call for performance optimization - use fallback rate
       

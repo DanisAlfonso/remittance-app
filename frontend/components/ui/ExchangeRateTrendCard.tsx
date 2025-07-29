@@ -30,7 +30,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
   const [currentRate, setCurrentRate] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingCurrentRate, setLoadingCurrentRate] = useState(true);
-  const [tooltipPosition, setTooltipPosition] = useState(40); // Percentage from left
+  // const [tooltipPosition, setTooltipPosition] = useState(40); // Unused - percentage from left
   const [stats, setStats] = useState({
     change: 0,
     changePercent: 0,
@@ -244,7 +244,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
                   const max = Math.max(...values);
                   const range = max - min;
                   // Increased padding to reduce dramatic fluctuations: 50% both sides
-                  const topPadding = Math.max(range * 0.5, 0.2);
+                  // const topPadding = Math.max(range * 0.5, 0.2); // Unused
                   const bottomPadding = Math.max(range * 0.5, 0.2);
                   const baseline = Math.max(0, min - bottomPadding);
                   
@@ -285,7 +285,6 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 dataPointsWidth={8}
                 dataPointsShape="circular"
                 // Ensure smooth rendering and proper alignment
-                curved={false}
                 interpolateMissingValues={false}
                 // Remove forced spacing to let chart handle naturally
                 // spacing={50}
@@ -370,7 +369,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
                   autoAdjustPointerLabelPosition: false,
                   
                   // Simple fixed position tooltip that always works
-                  dynamicLegendComponent: (items: any[]) => {
+                  dynamicLegendComponent: (items: unknown[]) => {
                     console.log('🎯 Dynamic legend triggered with items:', items);
                     
                     if (!items || items.length === 0) {

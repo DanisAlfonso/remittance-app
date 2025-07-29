@@ -654,7 +654,7 @@ export class OBPApiService {
    * Creates virtual account for user and simulates incoming transfer.
    * Now supports currency-specific routing to the correct master account.
    */
-  async importSandboxData(userId?: string, currency: string = 'EUR'): Promise<BankingApiResponse<any>> {
+  async importSandboxData(userId?: string, currency: string = 'EUR'): Promise<BankingApiResponse<unknown>> {
     console.log(`💰 [IMPORT-TEST-DATA] Starting initial deposit simulation for user: ${userId} (${currency})`);
     
     if (!userId) {
@@ -692,7 +692,7 @@ export class OBPApiService {
       console.log(`🔍 [IMPORT-TEST-DATA] Checking if user already has virtual ${currency} account...`);
       
       const { prisma } = await import('../config/database.js');
-      let existingAccount = await prisma.bankAccount.findFirst({
+      const existingAccount = await prisma.bankAccount.findFirst({
         where: {
           userId,
           currency,

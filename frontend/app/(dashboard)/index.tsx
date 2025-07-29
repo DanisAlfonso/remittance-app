@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
-import { bankingService } from '../../lib/bankingService';
+// import { bankingService } from '../../lib/bankingService'; // Unused import
 import { transferService } from '../../lib/transfer';
 import type { Transfer } from '../../types/transfer';
 import { apiClient } from '../../lib/api';

@@ -8,6 +8,7 @@
 
 import { prisma } from '../config/database';
 import { Decimal } from '@prisma/client/runtime/library';
+import type { Transaction } from '../generated/prisma';
 import { obpApiService } from './obp-api';
 
 // Master account configuration for multi-currency operations
@@ -234,7 +235,7 @@ export class MasterAccountBankingService {
     }
     
     // Validate sufficient balance including fees
-    const fees = this.calculateTransferFees(request.amount, request.currency);
+    const fees = this.calculateTransferFees();
     const totalRequired = request.amount + fees.totalFee;
     
     const currentBalance = userAccount.lastBalance || new Decimal(0);
@@ -460,7 +461,7 @@ export class MasterAccountBankingService {
   /**
    * Retrieves comprehensive transaction history for compliance and user transparency
    */
-  async getTransactionHistory(userId: string, currency?: SupportedCurrency, limit = 50): Promise<unknown[]> {
+  async getTransactionHistory(userId: string, currency?: SupportedCurrency, limit = 50): Promise<Transaction[]> {
     const transactions = await prisma.transaction.findMany({
       where: {
         userId,
@@ -572,7 +573,7 @@ export class MasterAccountBankingService {
     };
   }
   
-  private calculateTransferFees(amount: number, currency: SupportedCurrency): { platformFee: number; processingFee: number; totalFee: number } {
+  private calculateTransferFees(): { platformFee: number; processingFee: number; totalFee: number } {
     // Free transfers for all users
     return {
       platformFee: 0,

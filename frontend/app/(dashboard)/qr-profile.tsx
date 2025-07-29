@@ -9,6 +9,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import { useAuthStore } from '../../lib/auth';
 import ProfileCircle from '../../components/ui/ProfileCircle';
+import AppIcon from '../../assets/icon.png';
 
 const { width } = Dimensions.get('window');
 const QR_SIZE = Math.min(width * 0.7, 300);
@@ -17,7 +18,7 @@ export default function QRProfileScreen() {
   const { user } = useAuthStore();
   const params = useLocalSearchParams();
   const [isProcessing, setIsProcessing] = useState(false);
-  const qrRef = useRef<any>(null);
+  const qrRef = useRef<unknown>(null);
 
   // Use current user or provided user data
   const displayUser = params.userId && params.name 
@@ -206,7 +207,7 @@ export default function QRProfileScreen() {
             size={QR_SIZE}
             color="#1E293B"
             backgroundColor="#FFFFFF"
-            logo={require('../../assets/icon.png')}
+            logo={AppIcon}
             logoSize={QR_SIZE * 0.15}
             logoBackgroundColor="transparent"
             logoBorderRadius={10}

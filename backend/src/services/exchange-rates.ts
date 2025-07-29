@@ -1,5 +1,3 @@
-import { env } from '../config/environment';
-
 /**
  * Exchange Rate Service
  * 
@@ -113,7 +111,7 @@ export class ExchangeRateService {
         success: false,
         error: {
           error: 'EXCHANGE_RATE_FETCH_FAILED',
-          error_description: `Failed to fetch exchange rate for ${fromCurrency} to ${toCurrency}: ${error.message}`
+          error_description: `Failed to fetch exchange rate for ${fromCurrency} to ${toCurrency}: ${error instanceof Error ? error.message : 'Unknown error'}`
         }
       };
     }
@@ -280,7 +278,7 @@ export class ExchangeRateService {
         success: false,
         error: {
           error: 'EUR_HNL_RATE_FAILED',
-          error_description: `Failed to get EUR/HNL rates: ${error.message}`
+          error_description: `Failed to get EUR/HNL rates: ${error instanceof Error ? error.message : 'Unknown error'}`
         }
       };
     }

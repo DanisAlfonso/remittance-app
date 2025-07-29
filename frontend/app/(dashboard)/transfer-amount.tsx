@@ -269,12 +269,12 @@ export default function TransferAmountScreen() {
     }
     
     if (numAmount < 1) {
-      Alert.alert('Minimum Amount', 'Minimum transfer amount is €1');
+      Alert.alert('Minimum Amount', `Minimum transfer amount is ${getCurrencySymbol(selectedAccount?.currency || 'EUR')}1`);
       return false;
     }
     
     if (numAmount > 10000) {
-      Alert.alert('Maximum Amount', 'Maximum transfer amount is €10,000');
+      Alert.alert('Maximum Amount', `Maximum transfer amount is ${getCurrencySymbol(selectedAccount?.currency || 'EUR')}10,000`);
       return false;
     }
     
@@ -372,7 +372,7 @@ export default function TransferAmountScreen() {
       
       Alert.alert(
         'Transfer Initiated!',
-        `Your transfer of €${amount} to ${recipientName} has been initiated successfully.`,
+        `Your transfer of ${getCurrencySymbol(selectedAccount?.currency || 'EUR')}${amount} to ${recipientName} has been initiated successfully.`,
         [
           {
             text: 'View Details',
@@ -418,6 +418,16 @@ export default function TransferAmountScreen() {
     }
   };
 
+  const getCurrencySymbol = (currencyCode: string): string => {
+    const symbols: Record<string, string> = {
+      'EUR': '€',
+      'HNL': 'L',
+      'USD': '$',
+      'GBP': '£'
+    };
+    return symbols[currencyCode] || currencyCode;
+  };
+
   const formatCurrency = (value: number, currencyCode: string): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -453,7 +463,9 @@ export default function TransferAmountScreen() {
           <View style={styles.amountSection}>
             <Text style={styles.amountLabel}>You send</Text>
             <View style={styles.amountContainer}>
-              <Text style={styles.currencySymbol}>€</Text>
+              <Text style={styles.currencySymbol}>
+                {getCurrencySymbol(selectedAccount?.currency || 'EUR')}
+              </Text>
               <TextInput
                 style={styles.amountInput}
                 value={amount}

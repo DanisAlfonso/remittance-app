@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWalletStore } from '../../lib/walletStore';
 import { useAuthStore } from '../../lib/auth';
@@ -20,10 +20,13 @@ interface Recipient {
 }
 
 export default function SendMoneyScreen() {
+  const { currency } = useLocalSearchParams<{ currency?: string }>();
   const { selectedAccount } = useWalletStore();
   const { user, token } = useAuthStore();
   const [step, setStep] = useState<FlowStep>('recipients');
-  const [selectedCurrency, setSelectedCurrency] = useState<'EUR' | 'HNL' | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<'EUR' | 'HNL' | null>(
+    currency ? (currency as 'EUR' | 'HNL') : null
+  );
   const [recentRecipients, setRecentRecipients] = useState<Recipient[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
 
@@ -150,7 +153,14 @@ export default function SendMoneyScreen() {
   };
 
   const handleAddRecipient = () => {
-    setStep('currency');
+    if (currency) {
+      // Currency already selected from account - skip to method selection
+      setSelectedCurrency(currency as 'EUR' | 'HNL');
+      setStep('method');
+    } else {
+      // No currency pre-selected - go to currency selection
+      setStep('currency');
+    }
   };
 
   const handleSelectCurrency = (currency: 'EUR' | 'HNL') => {
@@ -186,7 +196,9 @@ export default function SendMoneyScreen() {
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Send Money</Text>
-          <Text style={styles.headerSubtitle}>Choose recipient</Text>
+          <Text style={styles.headerSubtitle}>
+            {currency ? `Send ${currency} - Choose recipient` : 'Choose recipient'}
+          </Text>
         </View>
         <View style={styles.headerAction} />
       </View>
@@ -352,7 +364,7 @@ export default function SendMoneyScreen() {
       </View>
 
       <View style={styles.modernContent}>
-        {selectedCurrency === 'EUR' && (
+        {(selectedCurrency === 'EUR' || selectedCurrency === 'HNL') && (
           <TouchableOpacity 
             style={styles.modernMethodCard} 
             onPress={() => handleSelectMethod('app_user')}
@@ -363,7 +375,7 @@ export default function SendMoneyScreen() {
             <View style={styles.modernCardContent}>
               <Text style={styles.modernCardTitle}>To App User</Text>
               <Text style={styles.modernCardSubtitle}>
-                Search by username, email, or phone number
+                Send to another {selectedCurrency} account holder
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />

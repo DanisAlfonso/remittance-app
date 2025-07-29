@@ -421,16 +421,29 @@ export default function DashboardScreen() {
         {/* Quick Actions - Updated positioning */}
         {selectedAccount && balance && (
           <View style={styles.quickActionsSection}>
-            <Text style={styles.quickActionsSectionTitle}>Quick Actions</Text>
+            <Text style={styles.quickActionsSectionTitle}>
+              {selectedAccount?.currency} Wallet
+            </Text>
             <View style={styles.quickActionsGrid}>
               <Pressable 
-                style={[styles.actionButton, styles.primaryAction]}
-                onPress={() => router.push('/(dashboard)/send-money')}
+                style={[
+                  styles.actionButton, 
+                  selectedAccount?.currency === 'HNL' ? styles.hnlSendAction : styles.primaryAction
+                ]}
+                onPress={() => router.push({
+                  pathname: '/(dashboard)/send-money',
+                  params: { currency: selectedAccount?.currency || 'EUR' }
+                })}
               >
                 <View style={styles.actionIconContainer}>
                   <Ionicons name="paper-plane" size={24} color="#FFFFFF" />
                 </View>
-                <Text style={styles.actionButtonText}>Send Money</Text>
+                <View style={styles.actionTextContainer}>
+                  <Text style={styles.actionButtonText}>Send {selectedAccount?.currency}</Text>
+                  <Text style={styles.actionButtonSubtext}>
+                    {selectedAccount?.currency === 'EUR' ? 'Euros' : 'Lempiras'}
+                  </Text>
+                </View>
               </Pressable>
               
               <Pressable 
@@ -705,24 +718,32 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryAction: {
-    backgroundColor: '#3B82F6', // Primary blue
+    backgroundColor: '#3B82F6', // Primary blue for EUR
     shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
+  hnlSendAction: {
+    backgroundColor: '#8B5CF6', // Elegant purple for HNL
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   qrAction: {
-    backgroundColor: '#10B981', // Green for QR code
-    shadowColor: '#10B981',
+    backgroundColor: '#64748B', // Sophisticated slate for My QR Code
+    shadowColor: '#64748B',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
   scanAction: {
-    backgroundColor: '#8B5CF6', // Purple for scan
-    shadowColor: '#8B5CF6',
+    backgroundColor: '#F59E0B', // Warm amber/gold for Scan QR
+    shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -756,6 +777,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: 0.3,
+  },
+  actionTextContainer: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  actionButtonSubtext: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
   qrActionText: {
     color: '#FFFFFF',

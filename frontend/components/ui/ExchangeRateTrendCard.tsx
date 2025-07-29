@@ -20,12 +20,10 @@ interface TrendData {
   originalRate?: number;
   label?: string;
   focused?: boolean;
+  hideDataPoint?: boolean;
 }
 
-type TimePeriod = '1w' | '1m';
-
 export const ExchangeRateTrendCard: React.FC = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1w');
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [currentRate, setCurrentRate] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,38 +38,37 @@ export const ExchangeRateTrendCard: React.FC = () => {
     average: 0,
   });
   const [error, setError] = useState<string | null>(null);
+  
 
-  // Fetch current live exchange rate (independent of period)
+  // Fetch current live exchange rate using ExchangeRate-API (independent of period)
   const fetchCurrentRate = async () => {
     setLoadingCurrentRate(true);
     try {
-      const response = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json');
+      const response = await fetch('https://v6.exchangerate-api.com/v6/277a4201a5eca527be7d2a0b/latest/EUR');
       if (response.ok) {
         const data = await response.json();
-        if (data.eur?.hnl) {
-          setCurrentRate(data.eur.hnl);
+        if (data.conversion_rates?.HNL) {
+          setCurrentRate(data.conversion_rates.HNL);
         } else {
-          // Fallback rate if API structure is different
           setCurrentRate(30.8);
         }
       } else {
-        setCurrentRate(30.8); // Fallback rate
+        setCurrentRate(30.8);
       }
     } catch (error) {
-      console.warn('Could not fetch current rate, using fallback:', error);
-      setCurrentRate(30.8); // Fallback rate
+      setCurrentRate(30.8);
     } finally {
       setLoadingCurrentRate(false);
     }
   };
 
-  const fetchTrendData = async (period: TimePeriod) => {
+  const fetchTrendData = async () => {
     setError(null);
     
-    // Check if we have cached data first to avoid unnecessary loading state
-    const days = period === '1w' ? 7 : 30;
-    const cacheKey = `optimized_${days}d`;
-    const hasCachedData = exchangeRateHistoryService.hasCachedData(cacheKey);
+    // Always use monthly data (30 days)
+    const days = 30;
+    const cacheKey = `real_api_${days}d`;
+    const hasCachedData = await exchangeRateHistoryService.hasCachedData(cacheKey);
     
     // Only show loading if we don't have cached data
     if (!hasCachedData) {
@@ -79,29 +76,22 @@ export const ExchangeRateTrendCard: React.FC = () => {
     }
     
     try {
-      const response = period === '1w' 
-        ? await exchangeRateHistoryService.getWeeklyTrend()
-        : await exchangeRateHistoryService.getMonthlyTrend();
+      const response = await exchangeRateHistoryService.getMonthlyTrend();
       
       if (response.success && response.data) {
-        const expectedCount = period === '1w' ? 7 : 30;
-        console.log(`📊 Chart received ${response.data.length} data points for ${period} (expected ${expectedCount})`);
-        // Removed detailed data point logging for performance
-        
-        // Transform data for the chart
-        const chartData: TrendData[] = response.data.map((item) => ({
-          value: item.rate,
-          label: '', // No labels by default
-          // Store original data for tap handling without displaying
-          originalDate: item.date,
-          originalRate: item.rate,
-        }));
-        
-        console.log(`🎯 Created ${chartData.length} chart data points from ${response.data.length} API data points`);
+        // Transform data for the chart - only show data point for today
+        const chartData: TrendData[] = response.data.map((item, index) => {
+          const isToday = index === response.data.length - 1;
+          return {
+            value: item.rate,
+            label: '',
+            originalDate: item.date,
+            originalRate: item.rate,
+            hideDataPoint: !isToday,
+          };
+        });
         
         setTrendData(chartData);
-        
-        // Don't update current rate from historical data - keep it independent
         
         const calculatedStats = exchangeRateHistoryService.calculateTrendStats(response.data);
         setStats({
@@ -113,20 +103,19 @@ export const ExchangeRateTrendCard: React.FC = () => {
       }
     } catch (err) {
       setError('Unable to load exchange rate trend');
-      console.error('Exchange rate trend error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Fetch current rate only once on component mount
-    fetchCurrentRate();
+    const initializeWithRealData = async () => {
+      fetchCurrentRate();
+      fetchTrendData();
+    };
+    
+    initializeWithRealData();
   }, []);
-
-  useEffect(() => {
-    fetchTrendData(selectedPeriod);
-  }, [selectedPeriod]);
 
   const getTrendIcon = () => {
     switch (stats.trend) {
@@ -160,32 +149,9 @@ export const ExchangeRateTrendCard: React.FC = () => {
             <Text style={styles.title}>EUR → HNL</Text>
           </View>
           
-          {/* Period Toggle */}
-          <View style={styles.periodToggle}>
-            <Pressable
-              style={[
-                styles.periodButton,
-                selectedPeriod === '1w' && styles.periodButtonActive
-              ]}
-              onPress={() => setSelectedPeriod('1w')}
-            >
-              <Text style={[
-                styles.periodButtonText,
-                selectedPeriod === '1w' && styles.periodButtonTextActive
-              ]}>1W</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.periodButton,
-                selectedPeriod === '1m' && styles.periodButtonActive
-              ]}
-              onPress={() => setSelectedPeriod('1m')}
-            >
-              <Text style={[
-                styles.periodButtonText,
-                selectedPeriod === '1m' && styles.periodButtonTextActive
-              ]}>1M</Text>
-            </Pressable>
+          {/* No period toggle - 1M only */}
+          <View style={styles.periodLabel}>
+            <Text style={styles.periodLabelText}>1M</Text>
           </View>
         </View>
 
@@ -211,14 +177,15 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 {stats.changePercent > 0 ? '+' : ''}{stats.changePercent.toFixed(2)}%
               </Text>
             </View>
-            <Text style={styles.periodLabel}>
-              {selectedPeriod === '1w' ? 'Past week' : 'Past month'}
+            <Text style={styles.periodDescription}>
+              Past month
             </Text>
           </View>
         </View>
 
         {/* Chart */}
         <View style={styles.chartSection}>
+          
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#1E40AF" />
@@ -230,7 +197,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
               <Text style={styles.errorText}>{error}</Text>
               <Pressable 
                 style={styles.retryButton}
-                onPress={() => fetchTrendData(selectedPeriod)}
+                onPress={() => fetchTrendData()}
               >
                 <Text style={styles.retryButtonText}>Retry</Text>
               </Pressable>
@@ -256,19 +223,17 @@ export const ExchangeRateTrendCard: React.FC = () => {
                     label: '',
                   }));
                   
-                  console.log(`📈 Transformed ${transformedData.length} data points for chart rendering`);
-                  
                   return transformedData;
                 })()}
-                width={screenWidth - 122} // Match the internal margin of other card elements
+                width={screenWidth - 80} // Use more screen space, minimal margins
                 height={200}
-                adjustToWidth={true} // Let chart adjust to show all points
+                adjustToWidth={true} // Let chart adjust properly
                 
-                // Area Chart Configuration with straight lines
+                // Smooth line chart like real finance apps (Apple Stocks, Trading212, etc.)
                 areaChart={true}
-                curved={false}
+                curved={true} // Smooth curves like professional finance apps
                 isAnimated={true}
-                animationDuration={1200}
+                animationDuration={800}
                 
                 // Disable constant data point text display
                 showValuesAsDataPointsText={false}
@@ -277,19 +242,36 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 color={getTrendColor()}
                 thickness={2}
                 
-                // Improved data points positioning and appearance
+                // Show only today's data point using color array approach
                 hideDataPoints={false}
-                dataPointsColor={getTrendColor()}
-                dataPointsRadius={4}
-                dataPointsHeight={8}
-                dataPointsWidth={8}
-                dataPointsShape="circular"
-                // Ensure smooth rendering and proper alignment
+                dataPointsColor={(() => {
+                  const colors = trendData.map((_, index) => {
+                    const isToday = index === trendData.length - 1;
+                    return isToday ? getTrendColor() : 'transparent';
+                  });
+                  return colors;
+                })()}
+                dataPointsRadius={6}
+                dataPointsHeight={12}
+                dataPointsWidth={12}
+                showValuesAsDataPointsText={false}
+                
+                // Chart spacing and layout configuration
                 interpolateMissingValues={false}
-                // Remove forced spacing to let chart handle naturally
-                // spacing={50}
-                initialSpacing={0}
-                endSpacing={0}
+                // Fit all data points without scrolling
+                spacing={(() => {
+                  const availableWidth = screenWidth - 80 - 60; // Account for Y-axis labels and margins
+                  const dataPoints = trendData.length;
+                  if (dataPoints <= 1) { return 50; } // Default spacing for single point
+                  
+                  // Calculate spacing to fit all points without scrolling
+                  const calculatedSpacing = Math.floor(availableWidth / (dataPoints - 1));
+                  
+                  // Allow smaller spacing for 1M view to fit all data
+                  return Math.max(8, calculatedSpacing); // Minimum 8px instead of 20px
+                })()}
+                initialSpacing={5}
+                endSpacing={5}
                 
                 // Area fill gradient
                 startFillColor={getTrendColor()}
@@ -369,7 +351,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
                   autoAdjustPointerLabelPosition: false,
                   
                   // Simple fixed position tooltip that always works
-                  dynamicLegendComponent: (items: unknown[]) => {
+                  dynamicLegendComponent: (items: Array<{ originalDate?: string; originalRate?: number }>) => {
                     console.log('🎯 Dynamic legend triggered with items:', items);
                     
                     if (!items || items.length === 0) {
@@ -380,14 +362,19 @@ export const ExchangeRateTrendCard: React.FC = () => {
                     
                     // Access the original data directly from the item
                     if (item?.originalDate && item?.originalRate) {
+                      const isToday = new Date(item.originalDate).toDateString() === new Date().toDateString();
+                      
                       return (
                         <View style={styles.fixedTooltipContainer}>
                           <Text style={styles.tooltipSingleLine}>
-                            {item.originalRate.toFixed(2)} HNL • {new Date(item.originalDate).toLocaleDateString('en-US', { 
+                            {item.originalRate.toFixed(2)} HNL • {isToday ? 'Today' : new Date(item.originalDate).toLocaleDateString('en-US', { 
                               weekday: 'short',
                               month: 'short', 
                               day: 'numeric' 
                             })}
+                            {isToday && (
+                              <Text style={styles.todayBadge}> LIVE</Text>
+                            )}
                           </Text>
                         </View>
                       );
@@ -476,28 +463,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
   },
-  periodToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    padding: 2,
-  },
-  periodButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    minWidth: 35,
-    alignItems: 'center',
-  },
-  periodButtonActive: {
+  periodLabel: {
     backgroundColor: '#1E40AF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  periodButtonText: {
+  periodLabelText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
-  },
-  periodButtonTextActive: {
     color: '#FFFFFF',
   },
   statsContainer: {
@@ -557,18 +531,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  periodLabel: {
+  periodDescription: {
     fontSize: 12,
     color: '#9CA3AF',
     marginTop: 2,
   },
   chartSection: {
     marginVertical: 16,
+    marginHorizontal: 4, // Reduced margin to use more screen space
     alignItems: 'center',
+    overflow: 'hidden',
   },
   chartWrapper: {
     width: '100%',
     alignItems: 'center',
+    overflow: 'hidden', // Prevent any overflow
   },
   timelineContainer: {
     flexDirection: 'row',
@@ -799,5 +776,25 @@ const styles = StyleSheet.create({
     maxWidth: 200,
     borderWidth: 1,
     borderColor: '#374151',
+  },
+  // Today badge in tooltip
+  todayBadge: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  // Single data point for today only (minimalist design)
+  todayOnlyDataPoint: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });

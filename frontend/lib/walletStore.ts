@@ -99,7 +99,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       },
 
       loadAccounts: async () => {
-        const { userId } = get();
+        const { userId, selectedAccount } = get();
         console.log(`🏦 Loading accounts for user: ${userId}`);
         set({ isLoading: true, error: null });
         
@@ -115,9 +115,23 @@ export const useWalletStore = create<WalletState & WalletActions>()(
             }))
           });
           
+          // Preserve the currently selected account if it still exists
+          let newSelectedAccount = null;
+          if (selectedAccount) {
+            newSelectedAccount = response.accounts.find(acc => acc.id === selectedAccount.id) || null;
+            console.log(`🔄 Preserving selected account: ${selectedAccount.currency} (${selectedAccount.id})`);
+          }
+          
+          // If no account is selected or the previously selected account no longer exists,
+          // select the first available account
+          if (!newSelectedAccount && response.accounts.length > 0) {
+            newSelectedAccount = response.accounts[0];
+            console.log(`🔄 Auto-selecting first account: ${newSelectedAccount.currency} (${newSelectedAccount.id})`);
+          }
+          
           set({
             accounts: response.accounts,
-            selectedAccount: response.accounts[0] || null,
+            selectedAccount: newSelectedAccount,
             isLoading: false,
             error: null,
             isInitialized: true,

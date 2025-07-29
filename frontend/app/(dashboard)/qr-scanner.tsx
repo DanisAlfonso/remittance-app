@@ -4,11 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, Camera } from 'expo-camera';
+import { useWalletStore } from '../../lib/walletStore';
 
 const { width } = Dimensions.get('window');
 const SCAN_AREA_SIZE = Math.min(width * 0.7, 280);
 
 export default function QRScannerScreen() {
+  const { selectedAccount } = useWalletStore();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
@@ -57,7 +59,7 @@ export default function QRScannerScreen() {
                   params: {
                     recipientUsername: username,
                     transferType: 'user', // @username transfer (will lookup IBAN and use OBP-API)
-                    currency: 'EUR', // Default currency - user can change if needed
+                    currency: selectedAccount?.currency || 'EUR', // Use selected account currency
                     fromQR: 'true'
                   }
                 });

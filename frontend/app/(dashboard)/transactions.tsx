@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,9 +8,13 @@ import type { Transfer } from '../../types/transfer';
 
 export default function TransactionsScreen() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [filteredTransfers, setFilteredTransfers] = useState<Transfer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([]);
 
   useEffect(() => {
     loadTransfers();
@@ -34,6 +38,13 @@ export default function TransactionsScreen() {
       });
       
       setTransfers(response.transfers);
+      
+      // Extract available currencies
+      const currencies = Array.from(new Set(response.transfers.map(t => t.sourceCurrency).filter(Boolean)));
+      setAvailableCurrencies(currencies);
+      
+      // Apply initial filter
+      applyFilter(response.transfers, selectedCurrency);
     } catch (error: unknown) {
       console.error('Failed to load transfers:', error);
       setError(error instanceof Error ? error.message : 'Failed to load transactions');
@@ -42,10 +53,25 @@ export default function TransactionsScreen() {
     }
   };
 
+  const applyFilter = (transferList: Transfer[], currency: string) => {
+    if (currency === 'ALL') {
+      setFilteredTransfers(transferList);
+    } else {
+      const filtered = transferList.filter(transfer => transfer.sourceCurrency === currency);
+      setFilteredTransfers(filtered);
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadTransfers();
     setIsRefreshing(false);
+  };
+
+  const handleCurrencyFilter = (currency: string) => {
+    setSelectedCurrency(currency);
+    applyFilter(transfers, currency);
+    setShowFilterModal(false);
   };
 
   const formatCurrency = (amount: number, currencyCode: string): string => {
@@ -62,11 +88,11 @@ export default function TransactionsScreen() {
   const calculateSummary = () => {
     let totalSent = 0;
     let totalReceived = 0;
-    let primaryCurrency = 'EUR'; // Default to EUR
+    let primaryCurrency = selectedCurrency === 'ALL' ? 'EUR' : selectedCurrency;
 
-    transfers.forEach((transfer) => {
-      // Use the first transfer's currency as primary currency for summary
-      if (primaryCurrency === 'EUR' && transfer.sourceCurrency) {
+    filteredTransfers.forEach((transfer) => {
+      // Use the selected currency or the first transfer's currency as primary currency for summary
+      if (primaryCurrency === 'EUR' && transfer.sourceCurrency && selectedCurrency === 'ALL') {
         primaryCurrency = transfer.sourceCurrency;
       }
       
@@ -227,8 +253,12 @@ export default function TransactionsScreen() {
           <Text style={styles.headerTitle}>Transactions</Text>
           <Text style={styles.headerSubtitle}>Your transaction history</Text>
         </View>
-        <TouchableOpacity style={styles.filterButton}>
+        <TouchableOpacity 
+          style={[styles.filterButton, selectedCurrency !== 'ALL' && styles.filterButtonActive]} 
+          onPress={() => setShowFilterModal(true)}
+        >
           <Ionicons name="filter" size={24} color="#1E3A8A" />
+          {selectedCurrency !== 'ALL' && <View style={styles.filterBadge} />}
         </TouchableOpacity>
       </View>
 
@@ -260,8 +290,13 @@ export default function TransactionsScreen() {
       {/* Transactions Section */}
       <View style={styles.transactionsContainer}>
         <View style={styles.sectionHeaderModern}>
-          <Text style={styles.sectionTitleModern}>All Transactions</Text>
-          <Text style={styles.transactionCount}>{transfers.length} transactions</Text>
+          <Text style={styles.sectionTitleModern}>
+            {selectedCurrency === 'ALL' ? 'All Transactions' : `${selectedCurrency} Transactions`}
+          </Text>
+          <Text style={styles.transactionCount}>
+            {filteredTransfers.length} transaction{filteredTransfers.length !== 1 ? 's' : ''}
+            {selectedCurrency !== 'ALL' && ` • ${transfers.length} total`}
+          </Text>
         </View>
         
         {isLoading ? (
@@ -287,9 +322,9 @@ export default function TransactionsScreen() {
               <Text style={styles.retryButtonText}>Try Again</Text>
             </TouchableOpacity>
           </View>
-        ) : transfers.length > 0 ? (
+        ) : filteredTransfers.length > 0 ? (
           <FlatList
-            data={transfers}
+            data={filteredTransfers}
             renderItem={renderTransaction}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
@@ -324,6 +359,86 @@ export default function TransactionsScreen() {
           </View>
         )}
       </View>
+
+      {/* Currency Filter Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showFilterModal}
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter by Currency</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.currencyFilters}>
+              {/* All Currencies Option */}
+              <TouchableOpacity
+                style={[
+                  styles.currencyFilterOption,
+                  selectedCurrency === 'ALL' && styles.currencyFilterOptionActive
+                ]}
+                onPress={() => handleCurrencyFilter('ALL')}
+              >
+                <View style={styles.currencyFilterContent}>
+                  <View style={styles.currencyIconContainer}>
+                    <Ionicons name="list" size={20} color={selectedCurrency === 'ALL' ? '#3B82F6' : '#6B7280'} />
+                  </View>
+                  <Text style={[
+                    styles.currencyFilterText,
+                    selectedCurrency === 'ALL' && styles.currencyFilterTextActive
+                  ]}>
+                    All Currencies
+                  </Text>
+                </View>
+                {selectedCurrency === 'ALL' && (
+                  <Ionicons name="checkmark" size={20} color="#3B82F6" />
+                )}
+              </TouchableOpacity>
+
+              {/* Individual Currency Options */}
+              {availableCurrencies.map((currency) => (
+                <TouchableOpacity
+                  key={currency}
+                  style={[
+                    styles.currencyFilterOption,
+                    selectedCurrency === currency && styles.currencyFilterOptionActive
+                  ]}
+                  onPress={() => handleCurrencyFilter(currency)}
+                >
+                  <View style={styles.currencyFilterContent}>
+                    <View style={styles.currencyIconContainer}>
+                      <Text style={[
+                        styles.currencySymbol,
+                        { color: selectedCurrency === currency ? '#3B82F6' : '#6B7280' }
+                      ]}>
+                        {currency === 'EUR' ? '€' : currency === 'HNL' ? 'L' : currency}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.currencyFilterText,
+                      selectedCurrency === currency && styles.currencyFilterTextActive
+                    ]}>
+                      {currency === 'EUR' ? 'Euros' : currency === 'HNL' ? 'Honduran Lempira' : currency}
+                    </Text>
+                  </View>
+                  {selectedCurrency === currency && (
+                    <Ionicons name="checkmark" size={20} color="#3B82F6" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -377,6 +492,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  filterButtonActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#3B82F6',
   },
 
   // 💎 Modern Summary Cards
@@ -660,5 +788,91 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+
+  // 🎯 Filter Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 34, // Safe area padding
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E3A8A',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currencyFilters: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  currencyFilterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  currencyFilterOptionActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#3B82F6',
+  },
+  currencyFilterContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  currencyIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  currencySymbol: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  currencyFilterText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  currencyFilterTextActive: {
+    color: '#1E3A8A',
   },
 });

@@ -574,6 +574,168 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
       challenge_type: 'SANDBOX_TAN'
     };
 
+    // 🔍 PRIORITY CHECK: Is this an internal transfer? (skip OBP-API for internal transfers)
+    console.log(`🔍 Checking if IBAN ${transferData.recipientAccount.iban} is an internal transfer...`);
+    
+    // Step 1: Find the recipient user by IBAN (any currency)
+    const recipientUserAccount = await prisma.bankAccount.findFirst({
+      where: {
+        iban: transferData.recipientAccount.iban,
+        status: 'ACTIVE',
+        accountType: 'virtual_remittance'
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    if (!recipientUserAccount) {
+      console.log(`🌐 External transfer: IBAN ${transferData.recipientAccount.iban} is not an app user`);
+    } else {
+      console.log(`👤 Found app user: ${recipientUserAccount.user.firstName} ${recipientUserAccount.user.lastName} (${recipientUserAccount.user.email})`);
+      
+      // Step 2: Check if this user has an account in the correct currency
+      const recipientCurrencyAccount = await prisma.bankAccount.findFirst({
+        where: {
+          userId: recipientUserAccount.user.id,
+          currency: transferData.transferDetails.currency,
+          status: 'ACTIVE',
+          accountType: 'virtual_remittance'
+        }
+      });
+
+      if (!recipientCurrencyAccount) {
+        console.log(`🔧 User ${recipientUserAccount.user.firstName} doesn't have a ${transferData.transferDetails.currency} account. Auto-creating...`);
+        
+        // Step 3: Auto-create the currency account for the recipient
+        try {
+          const { masterAccountBanking } = await import('../services/master-account-banking.js');
+          await masterAccountBanking.createVirtualAccount(
+            recipientUserAccount.user.id, 
+            transferData.transferDetails.currency as 'EUR' | 'HNL',
+            `${transferData.transferDetails.currency} Account`
+          );
+          console.log(`✅ Auto-created ${transferData.transferDetails.currency} account for user ${recipientUserAccount.user.firstName}`);
+        } catch (createError) {
+          console.error(`❌ Failed to auto-create ${transferData.transferDetails.currency} account:`, createError);
+          res.status(500).json({
+            error: {
+              error_code: 'OBP-50004',
+              error_message: `Recipient doesn't have a ${transferData.transferDetails.currency} account and auto-creation failed`
+            }
+          });
+          return;
+        }
+      }
+
+      // Step 4: Get the final recipient account (either existing or newly created)
+      const recipientAccount = await prisma.bankAccount.findFirst({
+        where: {
+          userId: recipientUserAccount.user.id,
+          currency: transferData.transferDetails.currency,
+          status: 'ACTIVE',
+          accountType: 'virtual_remittance'
+        },
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          }
+        }
+      });
+
+    if (recipientAccount) {
+      // 💫 INTERNAL TRANSFER: Route directly to internal banking system
+      console.log(`💫 Internal transfer detected: ${transferData.recipientAccount.iban} belongs to ${recipientAccount.user.firstName} ${recipientAccount.user.lastName}`);
+      console.log(`💫 Skipping OBP-API and processing internally: ${userId} → ${recipientAccount.userId} (${transferData.transferDetails.amount} ${transferData.transferDetails.currency})`);
+      
+      try {
+        // Import internal banking service
+        const { masterAccountBanking } = await import('../services/master-account-banking.js');
+        
+        // Execute outbound transfer (debit sender)
+        console.log(`🔽 Step 1: Executing outbound transfer (debit sender)...`);
+        console.log(`🔽 Using recipient IBAN: ${recipientAccount.iban} (${recipientAccount.currency} account)`);
+        const outboundResult = await masterAccountBanking.executeOutboundTransfer({
+          fromUserId: userId,
+          currency: transferData.transferDetails.currency as 'EUR' | 'HNL',
+          amount: transferData.transferDetails.amount,
+          recipientIBAN: recipientAccount.iban!, // Use the correct currency account IBAN
+          recipientName: transferData.recipientDetails.firstName + ' ' + transferData.recipientDetails.lastName,
+          reference: transferData.transferDetails.reference
+        });
+
+        console.log(`✅ Outbound transfer completed:`, outboundResult.referenceNumber);
+
+        // Execute inbound transfer (credit recipient)
+        console.log(`🔼 Step 2: Executing inbound transfer (credit recipient)...`);
+        console.log(`🔼 Using recipient IBAN: ${recipientAccount.iban} (${recipientAccount.currency} account)`);
+        const inboundResult = await masterAccountBanking.processInboundTransfer({
+          virtualIBAN: recipientAccount.iban!, // Use the correct currency account IBAN
+          amount: transferData.transferDetails.amount,
+          currency: transferData.transferDetails.currency as 'EUR' | 'HNL',
+          senderDetails: {
+            name: 'Internal Transfer',
+            reference: transferData.transferDetails.reference
+          }
+        });
+
+        console.log(`✅ Inbound transfer completed:`, inboundResult.referenceNumber);
+        console.log(`🎉 Internal transfer fully complete: ${outboundResult.referenceNumber} → ${inboundResult.referenceNumber}`);
+
+        // Transform internal response to match OBP format for frontend
+        const transformedResponse = {
+          transfer: {
+            id: outboundResult.referenceNumber,
+            status: 'PENDING',
+            type: 'INTERNAL',
+            from: {
+              bank_id: fromBankId,
+              account_id: fromAccountId
+            },
+            details: {
+              to_sepa: {
+                iban: recipientAccount.iban! // Use the correct currency account IBAN
+              },
+              value: {
+                currency: transferData.transferDetails.currency,
+                amount: transferData.transferDetails.amount.toString()
+              },
+              description: transferData.transferDetails.reference
+            },
+            created_at: new Date().toISOString()
+          },
+          message: 'Internal transfer executed successfully'
+        };
+        
+        res.status(201).json(transformedResponse);
+        return;
+      } catch (internalError) {
+        console.error(`❌ Internal transfer failed:`, internalError);
+        res.status(500).json({
+          error: {
+            error_code: 'OBP-50001',
+            error_message: `Internal transfer failed: ${internalError instanceof Error ? internalError.message : 'Unknown error'}`
+          }
+        });
+        return;
+      }
+    }
+    }
+
+    // 🌐 EXTERNAL TRANSFER: Continue with OBP-API for external recipients
+    console.log(`🌐 External transfer: ${transferData.recipientAccount.iban} is not an app user, proceeding with OBP-API...`);
+    
     // Call real OBP-API service
     const result = await obpApiService.createTransactionRequest(obpRequestData);
     

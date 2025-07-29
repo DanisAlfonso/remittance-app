@@ -2,8 +2,10 @@
  * Exchange Rate History Service
  * 
  * Fetches historical exchange rate data for EUR-HNL trends
- * Uses the ExchangeRate-API historical data endpoint
+ * Uses ExchangeRate-API for real historical data with 6-hour caching
  */
+
+import * as SecureStore from 'expo-secure-store';
 
 interface HistoricalRateData {
   date: string;
@@ -18,18 +20,67 @@ interface HistoricalResponse {
 }
 
 export class ExchangeRateHistoryService {
-  // Using free fawazahmed0/exchange-api - no API key required
-  private readonly baseUrl = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1';
+  // ExchangeRate-API for real historical data
+  private readonly apiKey = '277a4201a5eca527be7d2a0b';
+  private readonly baseUrl = 'https://v6.exchangerate-api.com/v6';
   
-  // Cache to reduce API usage
+  // Cache to reduce API usage and preserve credits
   private cache = new Map<string, { data: HistoricalRateData[], timestamp: number }>();
-  private readonly cacheValidityHours = 2; // Cache data for 2 hours instead of minutes
+  private readonly cacheValidityHours = 6; // Cache data for 6 hours to preserve API credits
   
   /**
-   * Check if cached data is still valid
+   * Load cached data from persistent storage (expo-secure-store)
    */
-  private isCacheValid(cacheKey: string): boolean {
-    const cached = this.cache.get(cacheKey);
+  private async loadFromPersistentCache(cacheKey: string): Promise<{ data: HistoricalRateData[], timestamp: number } | null> {
+    try {
+      const stored = await SecureStore.getItemAsync(`exchange_cache_${cacheKey}`);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      console.warn('Failed to load persistent cache:', error);
+    }
+    return null;
+  }
+
+  /**
+   * Save data to persistent storage (expo-secure-store)
+   */
+  private async saveToPersistentCache(cacheKey: string, data: HistoricalRateData[]): Promise<void> {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now()
+      };
+      await SecureStore.setItemAsync(`exchange_cache_${cacheKey}`, JSON.stringify(cacheData));
+      
+      // Also store in memory cache
+      this.cache.set(cacheKey, cacheData);
+    } catch (error) {
+      console.warn('Failed to save persistent cache:', error);
+      
+      // Fallback to memory cache only
+      this.cache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+  }
+
+  /**
+   * Check if cached data is still valid (checks both memory and persistent cache)
+   */
+  private async isCacheValid(cacheKey: string): Promise<boolean> {
+    // Check memory cache first
+    let cached = this.cache.get(cacheKey);
+    
+    // If not in memory, try persistent cache
+    if (!cached) {
+      const persistentCached = await this.loadFromPersistentCache(cacheKey);
+      if (persistentCached) {
+        // Restore to memory cache
+        cached = persistentCached;
+        this.cache.set(cacheKey, persistentCached);
+      }
+    }
+    
     if (!cached) {
       return false;
     }
@@ -42,127 +93,177 @@ export class ExchangeRateHistoryService {
   /**
    * Public method to check if we have valid cached data (for UI optimization)
    */
-  hasCachedData(cacheKey: string): boolean {
+  async hasCachedData(cacheKey: string): Promise<boolean> {
     return this.isCacheValid(cacheKey);
+  }
+
+  /**
+   * Store current real rate for building historical database
+   */
+  private async storeCurrentRateForHistory(currentRate: number): Promise<void> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const todayKey = `daily_rate_${today}`;
+      
+      // Store today's rate if we don't have it yet
+      const existingRate = await SecureStore.getItemAsync(todayKey);
+      if (!existingRate) {
+        await SecureStore.setItemAsync(todayKey, JSON.stringify({
+          date: today,
+          rate: currentRate,
+          timestamp: Date.now()
+        }));
+      }
+    } catch (error) {
+      console.warn('Failed to store current rate for history:', error);
+    }
+  }
+
+  /**
+   * Load previously stored real rates to build historical chart
+   */
+  private async loadStoredHistoricalRates(days: number): Promise<HistoricalRateData[]> {
+    const rates: HistoricalRateData[] = [];
+    const today = new Date();
+    
+    try {
+      for (let i = 0; i < days; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayKey = `daily_rate_${dateStr}`;
+        
+        const storedRate = await SecureStore.getItemAsync(dayKey);
+        if (storedRate) {
+          const rateData = JSON.parse(storedRate);
+          rates.unshift({
+            date: dateStr,
+            rate: rateData.rate,
+            timestamp: date.getTime()
+          });
+        }
+      }
+      
+      
+    } catch (error) {
+      console.warn('Failed to load stored historical rates:', error);
+    }
+    
+    return rates;
+  }
+
+  /**
+   * Force clear cache to get fresh API data (for testing/debugging)
+   */
+  async clearCache(): Promise<void> {
+    this.cache.clear();
+    
+    try {
+      const cacheKeys = [
+        'exchange_cache_real_api_7d',
+        'exchange_cache_real_api_30d',
+        'exchange_cache_optimized_7d',
+        'exchange_cache_optimized_30d',
+        'exchange_cache_real_api_365d'
+      ];
+      
+      for (const key of cacheKeys) {
+        await SecureStore.deleteItemAsync(key);
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error clearing persistent cache:', error);
+    }
   }
 
   /**
    * Get historical exchange rates for the past N days
    */
   async getHistoricalRates(days: number = 7): Promise<HistoricalResponse> {
-    const cacheKey = `optimized_${days}d`;
+    const cacheKey = `real_api_${days}d`;
     
-    // Check cache first to reduce API usage
-    if (this.isCacheValid(cacheKey)) {
-      console.log(`📦 Using cached data for ${days} days`);
-      return {
-        success: true,
-        data: this.cache.get(cacheKey)!.data
-      };
-    }
+    // Check cache first to reduce API usage and preserve credits
+    const isCacheValidResult = await this.isCacheValid(cacheKey);
     
-    try {
-      // const rates: HistoricalRateData[] = []; // Unused
-      // const today = new Date(); // Unused
-      
-      // Generate fast simulated data without API calls for performance
-      console.log(`⚡ Generating ${days} days of optimized simulated data...`);
-      
-      // Use cached base rate or fallback for performance
-      const baseRate = 30.8; // Optimized fallback rate
-      
-      const simulatedResponse = await this.generateSimulatedData(days, baseRate);
-      
-      if (simulatedResponse.success && simulatedResponse.data) {
-        // Cache the complete data
-        this.cache.set(cacheKey, {
-          data: simulatedResponse.data,
-          timestamp: Date.now()
-        });
-        
-        return simulatedResponse;
+    if (isCacheValidResult) {
+      const cached = this.cache.get(cacheKey) || await this.loadFromPersistentCache(cacheKey);
+      if (cached) {
+        return {
+          success: true,
+          data: cached.data
+        };
       }
-      
-      // This should not happen, but just in case
-      return {
-        success: false,
-        error: 'Failed to generate simulated data'
-      };
-      
-    } catch (error) {
-      console.error('Error fetching historical rates from free API:', error);
-      
-      // Fallback to simulated data
-      return this.generateSimulatedData(days);
     }
-  }
-  
-  /**
-   * Generate simulated historical data based on current rate
-   * This provides a fallback when historical API data is unavailable
-   */
-  private async generateSimulatedData(days: number, providedBaseRate?: number): Promise<HistoricalResponse> {
+    
     try {
-      const baseRate = providedBaseRate || 30.8; // Use provided rate or fallback
-      
-      // Skip API call for performance optimization - use fallback rate
-      
       const rates: HistoricalRateData[] = [];
       const today = new Date();
       
-      console.log(`🎲 Generating ${days} data points with realistic EUR-HNL fluctuations`);
+      // Get current rate first for the most recent data point
+      const currentRateResponse = await fetch(`${this.baseUrl}/${this.apiKey}/latest/EUR`);
+      if (!currentRateResponse.ok) {
+        throw new Error(`ExchangeRate-API current rate failed: ${currentRateResponse.status}`);
+      }
       
-      // Generate realistic fluctuations around the base rate
-      for (let i = days - 1; i >= 0; i--) {
+      const currentData = await currentRateResponse.json();
+      const currentRate = currentData.conversion_rates?.HNL;
+      
+      if (!currentRate) {
+        throw new Error('HNL rate not found in current API response');
+      }
+      
+      for (let i = 0; i < days; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         
-        // Generate realistic daily fluctuation
-        // EUR-HNL typically fluctuates ±0.3% to ±1.5% daily
-        const volatility = 0.003 + Math.random() * 0.012; // 0.3% to 1.5%
-        const direction = Math.random() > 0.5 ? 1 : -1;
-        const dailyChange = baseRate * volatility * direction;
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1; // JavaScript months are 0-indexed
+        const day = date.getDate();
+        const dateStr = date.toISOString().split('T')[0];
         
-        // Add some random walk behavior for more realistic price action
-        const randomWalk = (Math.random() - 0.5) * 0.02; // Small random component
-        
-        // Add subtle weekly trend (some weeks up, some down)
-        const weeklyTrend = Math.sin((days - i) / 7) * 0.005 * baseRate;
-        
-        const rate = baseRate + dailyChange + randomWalk + weeklyTrend;
-        
-        // Ensure rate stays within reasonable bounds (±5% of base rate)
-        const minRate = baseRate * 0.95;
-        const maxRate = baseRate * 1.05;
-        const boundedRate = Math.max(minRate, Math.min(maxRate, rate));
-        
-        rates.push({
-          date: date.toISOString().split('T')[0],
-          rate: Math.round(boundedRate * 10000) / 10000, // 4 decimal places
-          timestamp: date.getTime()
-        });
-        
-        // Removed individual data point logging for performance
+        try {
+          let rate: number;
+          
+          if (i === 0) {
+            // Today: use current rate for most up-to-date data
+            rate = currentRate;
+          } else {
+            // Historical dates: use correct API format
+            const historicalUrl = `${this.baseUrl}/${this.apiKey}/history/EUR/${year}/${month}/${day}`;
+            
+            const historicalResponse = await fetch(historicalUrl);
+            
+            if (historicalResponse.ok) {
+              const historicalData = await historicalResponse.json();
+              rate = historicalData.conversion_rates?.HNL || currentRate;
+            } else {
+              rate = currentRate; // Fallback to current rate
+            }
+          }
+          
+          rates.unshift({ // Add to beginning to maintain chronological order
+            date: dateStr,
+            rate: Math.round(rate * 10000) / 10000, // 4 decimal places
+            timestamp: date.getTime()
+          });
+          
+          // Add small delay between API calls to be respectful
+          if (i > 0 && i < days - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          
+        } catch (error) {
+          // Fallback to current rate
+          rates.unshift({
+            date: dateStr,
+            rate: Math.round(currentRate * 10000) / 10000,
+            timestamp: date.getTime()
+          });
+        }
       }
       
-      console.log(`✅ Generated ${rates.length} data points successfully`);
-      
-      // CRITICAL DEBUG: Verify we actually have the right number of points
-      if (rates.length !== days) {
-        console.error(`🚨 MISMATCH: Generated ${rates.length} points but requested ${days} days!`);
-        console.error('Generated rates:', rates);
-      } else {
-        console.log(`✅ VERIFIED: Generated exactly ${days} data points as requested`);
-      }
-      
-      // Use consistent cache key with main function
-      const cacheKey = `optimized_${days}d`;
-      this.cache.set(cacheKey, {
-        data: rates,
-        timestamp: Date.now()
-      });
-      
-      console.log(`🎲 Generated and cached simulated data for ${days} days`);
+      // Cache the real API data with persistent storage
+      await this.saveToPersistentCache(cacheKey, rates);
       
       return {
         success: true,
@@ -170,12 +271,15 @@ export class ExchangeRateHistoryService {
       };
       
     } catch (error) {
+      console.error('Error fetching real exchange rates from ExchangeRate-API:', error);
+      
       return {
         success: false,
-        error: `Failed to generate simulated data: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: `Failed to fetch real exchange rates: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
+  
   
   /**
    * Get exchange rate trend for past week (7 days)

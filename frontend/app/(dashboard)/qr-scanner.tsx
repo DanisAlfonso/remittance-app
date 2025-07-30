@@ -114,7 +114,7 @@ export default function QRScannerScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContent}>
-          <Ionicons name="camera-off-outline" size={64} color="#EF4444" />
+          <Ionicons name="camera-outline" size={64} color="#EF4444" />
           <Text style={styles.messageText}>No access to camera</Text>
           <Text style={styles.submessageText}>
             Please grant camera permission in your device settings to scan QR codes

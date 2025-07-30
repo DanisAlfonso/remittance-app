@@ -55,7 +55,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
       } else {
         setCurrentRate(30.8);
       }
-    } catch (error) {
+    } catch {
       setCurrentRate(30.8);
     } finally {
       setLoadingCurrentRate(false);
@@ -80,8 +80,8 @@ export const ExchangeRateTrendCard: React.FC = () => {
       
       if (response.success && response.data) {
         // Transform data for the chart - only show data point for today
-        const chartData: TrendData[] = response.data.map((item, index) => {
-          const isToday = index === response.data.length - 1;
+        const chartData: TrendData[] = response.data!.map((item, index) => {
+          const isToday = index === response.data!.length - 1;
           return {
             value: item.rate,
             label: '',
@@ -101,7 +101,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
       } else {
         setError(response.error || 'Failed to fetch exchange rate data');
       }
-    } catch (err) {
+    } catch {
       setError('Unable to load exchange rate trend');
     } finally {
       setLoading(false);
@@ -244,17 +244,13 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 
                 // Show only today's data point using color array approach
                 hideDataPoints={false}
-                dataPointsColor={(() => {
-                  const colors = trendData.map((_, index) => {
-                    const isToday = index === trendData.length - 1;
-                    return isToday ? getTrendColor() : 'transparent';
-                  });
-                  return colors;
-                })()}
+                dataPointsColor={trendData.map((_, index) => {
+                  const isToday = index === trendData.length - 1;
+                  return isToday ? getTrendColor() : 'transparent';
+                }).join(',')}
                 dataPointsRadius={6}
                 dataPointsHeight={12}
                 dataPointsWidth={12}
-                showValuesAsDataPointsText={false}
                 
                 // Chart spacing and layout configuration
                 interpolateMissingValues={false}

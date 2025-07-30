@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -194,19 +194,34 @@ export default function AccountCarousel({
 }: AccountCarouselProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const scrollOffset = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollOffset / screenWidth);
-    setCurrentIndex(index);
     
-    // Auto-select the account that's currently in view
-    if (index < accounts.length && accounts[index]) {
-      const accountInView = accounts[index];
-      if (selectedAccount?.id !== accountInView.id) {
-        onAccountSelect(accountInView.id);
-      }
+    // Update current index immediately for visual feedback
+    setCurrentIndex(index);
+    setIsScrolling(true);
+    
+    // Clear existing timeout
+    if (scrollTimeout.current) {
+      clearTimeout(scrollTimeout.current);
     }
+    
+    // Set a timeout to handle account selection after scrolling stops
+    scrollTimeout.current = setTimeout(() => {
+      setIsScrolling(false);
+      
+      // Only auto-select if we're on a valid account card (not the add account card)
+      if (index < accounts.length && accounts[index]) {
+        const accountInView = accounts[index];
+        if (selectedAccount?.id !== accountInView.id) {
+          onAccountSelect(accountInView.id);
+        }
+      }
+    }, 150); // Small delay to ensure scroll has settled
   };
 
   const scrollToAccount = (index: number) => {
@@ -215,6 +230,26 @@ export default function AccountCarousel({
       animated: true,
     });
   };
+
+  // Ensure carousel is synced with selectedAccount from props
+  useEffect(() => {
+    if (selectedAccount && accounts.length > 0) {
+      const selectedIndex = accounts.findIndex(account => account.id === selectedAccount.id);
+      if (selectedIndex !== -1 && selectedIndex !== currentIndex && !isScrolling) {
+        setCurrentIndex(selectedIndex);
+        scrollToAccount(selectedIndex);
+      }
+    }
+  }, [selectedAccount, accounts, currentIndex, isScrolling]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+    };
+  }, []);
 
   const allItems = [...accounts, null]; // null represents the "Add Account" card
 

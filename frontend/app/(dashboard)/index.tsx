@@ -174,43 +174,24 @@ export default function DashboardScreen() {
       
       console.log('✅ Sandbox data imported:', result);
       
-      // Handle the new response format for initial deposit simulation
-      if (result.data.message && result.data.deposit) {
-        const currencySymbol = selectedAccount.currency === 'EUR' ? '€' : 'L.';
-        Alert.alert(
-          `💰 ${selectedAccount.currency} Deposit Complete!`, 
-          `${result.data.message}\n\n` +
-          `• Virtual IBAN: ${result.data.virtual_account.iban}\n` +
-          `• Amount: ${currencySymbol}${result.data.deposit.amount}.00\n` +
-          `• Reference: ${result.data.deposit.reference}\n\n` +
-          `${result.data.instructions}`,
-          [
-            {
-              text: 'Refresh Balance',
-              onPress: () => {
-                loadAccounts();
-                refreshAllData(true);
-              }
+      // Handle the actual OBP sandbox import response format
+      Alert.alert(
+        'Success!', 
+        `${result.message}\n\n` +
+        `• Banks imported: ${result.data.banks.length}\n` +
+        `• Total accounts: ${result.data.total_accounts}\n` +
+        `• Total transactions: ${result.data.total_transactions}\n\n` +
+        `Your ${selectedAccount.currency} account is now ready for testing transfers.`,
+        [
+          {
+            text: 'Refresh Accounts',
+            onPress: () => {
+              loadAccounts();
+              refreshAllData(true);
             }
-          ]
-        );
-      } else {
-        // Fallback for old format (master account funding)
-        Alert.alert(
-          'Success!', 
-          `Test data imported successfully for ${selectedAccount.currency} account!\n\n` +
-          `Your account is now ready for testing transfers.`,
-          [
-            {
-              text: 'Refresh Accounts',
-              onPress: () => {
-                loadAccounts();
-                refreshAllData(true);
-              }
-            }
-          ]
-        );
-      }
+          }
+        ]
+      );
     } catch (error) {
       console.error('❌ Sandbox import failed:', error);
       

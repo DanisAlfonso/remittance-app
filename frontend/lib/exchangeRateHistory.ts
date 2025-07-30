@@ -252,7 +252,7 @@ export class ExchangeRateHistoryService {
             await new Promise(resolve => setTimeout(resolve, 200));
           }
           
-        } catch (error) {
+        } catch {
           // Fallback to current rate
           rates.unshift({
             date: dateStr,

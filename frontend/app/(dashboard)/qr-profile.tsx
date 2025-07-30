@@ -18,7 +18,7 @@ export default function QRProfileScreen() {
   const { user } = useAuthStore();
   const params = useLocalSearchParams();
   const [isProcessing, setIsProcessing] = useState(false);
-  const qrRef = useRef<unknown>(null);
+  const qrRef = useRef<React.ComponentRef<typeof QRCode>>(null);
 
   // Use current user or provided user data
   const displayUser = params.userId && params.name 
@@ -77,7 +77,9 @@ export default function QRProfileScreen() {
       }
 
       // Generate QR code as base64
-      qrRef.current?.toDataURL((dataURL: string) => {
+      if (qrRef.current && 'toDataURL' in qrRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (qrRef.current as any).toDataURL((dataURL: string) => {
         const saveQRCode = async () => {
           try {
             // Save to file system first
@@ -100,7 +102,8 @@ export default function QRProfileScreen() {
         };
         
         saveQRCode();
-      });
+        });
+      }
     } catch (error) {
       console.error('Download error:', error);
       Alert.alert('Download Failed', 'Failed to download QR code');

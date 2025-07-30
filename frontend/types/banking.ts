@@ -59,6 +59,7 @@ export interface CreateBankAccountRequest {
 export interface BankingError {
   error: string;
   message: string;
+  statusCode?: number;
   details?: Array<{
     field: string;
     message: string;

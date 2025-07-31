@@ -11,6 +11,7 @@
  */
 
 import { prisma } from '../config/database';
+import { Prisma } from '@prisma/client';
 import { obpApiService } from './obp-api';
 import { ExchangeRateService } from './exchange-rates';
 
@@ -108,7 +109,7 @@ export class ProductionRemittanceService {
 
       // Step 3: Calculate amounts (real Remitly-style)
       const interBankRate = rateResult.rate;
-      const margin = 0.025; // 2.5% company margin
+      const margin = 0.015; // 1.5% company margin
       const customerRate = interBankRate * (1 - margin);
       const hnlAmount = request.amountEUR * customerRate;
       const platformFee = 0.99; // €0.99 fixed fee
@@ -184,24 +185,42 @@ export class ProductionRemittanceService {
             platformFee: platformFee,
             providerFee: 0,
             totalFee: platformFee,
-            description: request.description || `EUR → HNL Remittance to ${request.recipientName || 'Honduras'}`,
-            metadata: JSON.stringify({
-              recipientAccountId: request.recipientAccountId,
-              recipientName: request.recipientName,
-              interBankRate: interBankRate,
-              customerRate: customerRate,
-              exchangeMargin: exchangeMargin,
-              totalEURDeducted: totalEURDeducted,
-              hnlAmount: hnlAmount,
-              eurMasterBefore: eurMasterBalance,
-              hnlMasterBefore: hnlMasterBalance,
-              flow: 'production_remittance'
-            })
+            providerReference: `EUR→HNL to ${request.recipientName || 'Honduras'} (${request.recipientAccountId})`
           }
         });
 
         transactionId = transaction.id;
         console.log(`   📝 Transaction record: ${transactionId}`);
+
+        // STEP 1: Debit user's EUR virtual account balance
+        console.log(`\n💳 STEP 1: USER BALANCE DEBIT - €${totalEURDeducted.toFixed(2)}`);
+        const userEurAccount = await tx.bankAccount.findFirst({
+          where: {
+            userId: request.senderId,
+            currency: 'EUR'
+          }
+        });
+
+        if (!userEurAccount) {
+          throw new Error('User EUR account not found');
+        }
+
+        const currentUserBalance = userEurAccount.lastBalance || new Prisma.Decimal(0);
+        if (currentUserBalance.lt(totalEURDeducted)) {
+          throw new Error(`Insufficient EUR balance. Available: €${currentUserBalance}, Required: €${totalEURDeducted}`);
+        }
+
+        const newUserBalance = currentUserBalance.sub(totalEURDeducted);
+        await tx.bankAccount.update({
+          where: { id: userEurAccount.id },
+          data: {
+            lastBalance: newUserBalance,
+            balanceUpdatedAt: new Date()
+          }
+        });
+
+        console.log(`   💰 User balance: €${currentUserBalance} → €${newUserBalance}`);
+        console.log(`   ✅ User EUR account debited successfully`);
 
         // STEP A: EUR MASTER ACCOUNT IMPACT (Conceptual)
         console.log(`\n💶 STEP A: EUR MASTER IMPACT - €${totalEURDeducted.toFixed(2)}`);
@@ -257,13 +276,7 @@ export class ProductionRemittanceService {
           data: {
             status: 'COMPLETED',
             providerReference: hnlPayoutRequest.data?.id,
-            completedAt: new Date(),
-            metadata: JSON.stringify({
-              ...JSON.parse(transaction.metadata || '{}'),
-              eurDebitTransactionId: eurDebitId,
-              hnlPayoutTransactionId: hnlPayoutRequest.data?.id,
-              completedAt: new Date().toISOString()
-            })
+            completedAt: new Date()
           }
         });
 
@@ -327,10 +340,7 @@ export class ProductionRemittanceService {
             where: { id: transactionId },
             data: {
               status: 'FAILED',
-              metadata: JSON.stringify({
-                error: error instanceof Error ? error.message : 'Unknown error',
-                failedAt: new Date().toISOString()
-              })
+              providerReference: `FAILED: ${error instanceof Error ? error.message : 'Unknown error'}`
             }
           });
         } catch (updateError) {

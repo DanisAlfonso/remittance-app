@@ -98,7 +98,7 @@ export class RemittanceService {
 
       // Step 3: Calculate amounts with margin
       const interBankRate = rateResult.rate;
-      const margin = 0.025; // 2.5% company margin
+      const margin = 0.015; // 1.5% company margin
       const customerRate = interBankRate * (1 - margin);
       const hnlAmount = request.amountEUR * customerRate;
       const platformFee = 0.99; // €0.99 fixed fee

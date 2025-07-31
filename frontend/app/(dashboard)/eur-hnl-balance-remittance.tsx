@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
 import { apiClient } from '../../lib/api';
+import { remittanceService, type HNLRecipient } from '../../lib/remittanceService';
 
 type FlowStep = 'recipients' | 'amount' | 'confirm' | 'processing' | 'success';
 
@@ -13,6 +14,7 @@ interface Recipient {
   id: string;
   name: string;
   accountNumber: string;
+  accountId: string;
   bankName: string;
   currency: string;
   country: string;
@@ -31,13 +33,12 @@ interface BalanceRemittanceResult {
 }
 
 export default function EURHNLBalanceRemittanceScreen() {
-  const { sourceCurrency, targetCurrency, paymentType } = useLocalSearchParams<{ 
-    sourceCurrency?: string; 
-    targetCurrency?: string; 
-    paymentType?: string; 
-  }>();
+  const params = useLocalSearchParams();
+  const sourceCurrency = params.sourceCurrency?.toString() || 'EUR';
+  const targetCurrency = params.targetCurrency?.toString() || 'HNL';
+  const paymentType = params.paymentType?.toString() || 'balance';
   const { user, token } = useAuthStore();
-  const { accounts } = useWalletStore();
+  const { accounts, refreshBalance } = useWalletStore();
   const [step, setStep] = useState<FlowStep>('recipients');
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
@@ -50,44 +51,93 @@ export default function EURHNLBalanceRemittanceScreen() {
   const [eurBalance, setEurBalance] = useState<number>(0);
 
   useEffect(() => {
-    loadRecipients();
-    loadEurBalance();
-  }, []);
+    // Only load data if we have accounts
+    if (accounts && accounts.length > 0) {
+      loadRecipients();
+      loadEurBalance().catch(error => {
+        console.error('Failed to load EUR balance:', error);
+      });
+    }
+  }, [accounts]);
 
   useEffect(() => {
-    if (step === 'amount' && amount) {
+    if (step === 'amount' && amount && parseFloat(amount) > 0) {
       loadExchangeRate();
     }
   }, [step, amount]);
 
-  const loadEurBalance = () => {
+  const loadEurBalance = async () => {
     const eurAccount = accounts.find(acc => acc.currency === 'EUR');
-    if (eurAccount && eurAccount.balance) {
-      setEurBalance(parseFloat(eurAccount.balance.amount));
+    if (eurAccount) {
+      console.log('🔍 Found EUR account:', eurAccount.id, 'Loading balance...');
+      try {
+        // Use the wallet store to refresh the balance
+        await refreshBalance(eurAccount.id);
+        
+        // Get the updated balance from the wallet store
+        const { balance } = useWalletStore.getState();
+        if (balance && balance.amount) {
+          let balanceValue: number;
+          
+          // Handle different balance formats
+          if (typeof balance.amount === 'string') {
+            balanceValue = parseFloat(balance.amount);
+          } else if (typeof balance.amount === 'object' && 'value' in balance.amount) {
+            balanceValue = balance.amount.value;
+          } else if (typeof balance.amount === 'number') {
+            balanceValue = balance.amount;
+          } else {
+            console.warn('⚠️ Balance format unexpected:', balance);
+            setEurBalance(0);
+            return;
+          }
+          
+          if (!isNaN(balanceValue)) {
+            console.log('💰 EUR balance loaded:', balanceValue);
+            setEurBalance(balanceValue);
+          } else {
+            console.warn('⚠️ Could not parse balance value:', balance.amount);
+            setEurBalance(0);
+          }
+        } else {
+          console.warn('⚠️ No balance data found:', balance);
+          setEurBalance(0);
+        }
+      } catch (error) {
+        console.error('❌ Error loading EUR balance:', error);
+        setEurBalance(0);
+      }
+    } else {
+      console.log('📝 No EUR account found, setting balance to 0');
+      setEurBalance(0);
     }
   };
 
   const loadRecipients = async () => {
     setIsLoadingRecipients(true);
     try {
-      const response = await apiClient.get('/api/v1/beneficiaries');
+      console.log('🔍 Loading HNL recipients from HNLBANK...');
+      const result = await remittanceService.getHNLRecipients();
       
-      if (response.success && response.data?.beneficiaries) {
-        const hnlRecipients = response.data.beneficiaries
-          .filter((b: any) => b.currency === 'HNL')
-          .map((b: any) => ({
-            id: b.accountNumber,
-            name: `${b.firstName} ${b.lastName}`,
-            accountNumber: b.accountNumber,
-            bankName: b.bankName,
-            currency: 'HNL',
-            country: 'HN'
-          }));
+      if (result.success) {
+        const hnlRecipients = result.recipients.map((r: HNLRecipient) => ({
+          id: r.id,
+          name: r.name,
+          accountNumber: r.accountNumber,
+          accountId: r.accountId,
+          bankName: r.bankName,
+          currency: r.currency,
+          country: r.country
+        }));
         
+        console.log('✅ Loaded', hnlRecipients.length, 'HNL recipients');
         setRecipients(hnlRecipients);
+      } else {
+        console.error('❌ Failed to load recipients:', result.error);
+        setRecipients([]);
       }
     } catch (error) {
-      console.error('Failed to load recipients:', error);
+      console.error('❌ Failed to load recipients:', error);
       setRecipients([]);
     } finally {
       setIsLoadingRecipients(false);
@@ -95,17 +145,22 @@ export default function EURHNLBalanceRemittanceScreen() {
   };
 
   const loadExchangeRate = async () => {
+    if (!amount || parseFloat(amount) <= 0) return;
+    
     setIsLoadingRate(true);
     try {
-      const response = await apiClient.get('/api/v1/exchange-rates/EUR/HNL');
-      if (response.success && response.data?.rate) {
-        // Apply 2.5% margin like production service
-        const interBankRate = response.data.rate;
-        const customerRate = interBankRate * 0.975; // 2.5% margin
-        setCurrentRate(customerRate);
+      console.log('💱 Getting EUR/HNL rate for €', amount);
+      const result = await remittanceService.getExchangeRate(parseFloat(amount));
+      
+      if (result.success && result.data) {
+        setCurrentRate(result.data.customerRate);
+        console.log('✅ Exchange rate loaded:', result.data.customerRate, 'HNL/EUR');
+      } else {
+        console.error('❌ Failed to get exchange rate:', result.error);
+        setCurrentRate(29.5); // Fallback rate
       }
     } catch (error) {
-      console.error('Failed to load exchange rate:', error);
+      console.error('❌ Failed to load exchange rate:', error);
       setCurrentRate(29.5); // Fallback rate
     } finally {
       setIsLoadingRate(false);
@@ -144,34 +199,66 @@ export default function EURHNLBalanceRemittanceScreen() {
     setStep('processing');
 
     try {
-      // Use balance-based transfer (traditional account-to-account)
-      // This would integrate with existing transfer service for EUR balance → HNL conversion
-      
-      // For now, simulate the balance-based remittance
-      // In real implementation, this would:
-      // 1. Debit user's EUR account
-      // 2. Credit recipient's HNL account via internal conversion
-      // 3. Handle the EUR → HNL exchange internally
-      
-      const mockResult: BalanceRemittanceResult = {
-        success: true,
-        transactionId: `BAL_${Date.now()}`,
-        eurDeducted: parseFloat(amount),
-        hnlDeposited: parseFloat(amount) * currentRate,
-        exchangeRate: currentRate
-      };
+      console.log('🚀 Processing EUR → HNL remittance...');
+      console.log('   Amount:', amount, 'EUR');
+      console.log('   Recipient:', selectedRecipient.name);
+      console.log('   Account ID:', selectedRecipient.accountId);
 
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Execute real EUR → HNL remittance via production API
+      const result = await remittanceService.executeRemittance({
+        recipientAccountId: selectedRecipient.accountId,
+        amountEUR: parseFloat(amount),
+        description: `EUR → HNL remittance to ${selectedRecipient.name}`,
+        recipientName: selectedRecipient.name
+      });
 
-      setRemittanceResult(mockResult);
-      setStep('success');
+      if (result.success && result.data) {
+        console.log('✅ Remittance successful!', result.data.transactionId);
+        
+        // Update user's EUR balance in wallet store
+        try {
+          const { updateAccountBalance } = useWalletStore.getState();
+          const eurAccount = accounts.find(acc => acc.currency === 'EUR');
+          if (eurAccount && eurAccount.id) {
+            const newBalance = eurBalance - result.data.amountEUR;
+            updateAccountBalance(eurAccount.id, newBalance);
+            console.log('💰 EUR balance updated:', eurBalance, '→', newBalance);
+            
+            // Also update local balance state
+            setEurBalance(newBalance);
+          } else {
+            console.warn('⚠️ Could not find EUR account for balance update');
+          }
+        } catch (balanceError) {
+          console.error('❌ Failed to update EUR balance:', balanceError);
+          // Don't fail the whole transaction for balance update issues
+        }
+
+        setRemittanceResult({
+          success: true,
+          transactionId: result.data.transactionId,
+          eurDeducted: result.data.amountEUR,
+          hnlDeposited: result.data.amountHNL,
+          exchangeRate: result.data.exchangeRate
+        });
+        setStep('success');
+      } else {
+        console.error('❌ Remittance failed:', result.error);
+        setRemittanceResult({
+          success: false,
+          error: {
+            code: result.error?.code || 'REMITTANCE_FAILED',
+            message: result.error?.message || 'Transfer failed'
+          }
+        });
+        setStep('success');
+      }
     } catch (error) {
-      console.error('Balance remittance failed:', error);
+      console.error('❌ Remittance processing failed:', error);
       setRemittanceResult({
         success: false,
         error: {
-          code: 'BALANCE_REMITTANCE_FAILED',
+          code: 'PROCESSING_ERROR',
           message: error instanceof Error ? error.message : 'Unknown error occurred'
         }
       });
@@ -202,7 +289,7 @@ export default function EURHNLBalanceRemittanceScreen() {
     if (!eur) return { platformFee: 0, exchangeMargin: 0, total: 0 };
     
     const platformFee = 0; // No platform fee for balance transfers
-    const exchangeMargin = eur * 0.025; // 2.5% margin on exchange
+    const exchangeMargin = eur * 0.015; // 1.5% margin on exchange
     return {
       platformFee,
       exchangeMargin,
@@ -211,20 +298,43 @@ export default function EURHNLBalanceRemittanceScreen() {
   };
 
   // Render different steps
-  const renderRecipientsStep = () => (
-    <View style={styles.stepContainer}>
-      <View style={styles.modernHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>EUR → HNL from Balance</Text>
-          <Text style={styles.headerSubtitle}>Choose recipient in Honduras</Text>
+  const renderRecipientsStep = () => {
+    // Show loading if accounts aren't loaded yet
+    if (!accounts || accounts.length === 0) {
+      return (
+        <View style={styles.stepContainer}>
+          <View style={styles.modernHeader}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
+            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>Loading...</Text>
+              <Text style={styles.headerSubtitle}>Preparing EUR → HNL transfer</Text>
+            </View>
+            <View style={styles.headerAction} />
+          </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text style={styles.loadingText}>Loading your accounts...</Text>
+          </View>
         </View>
-        <View style={styles.headerAction} />
-      </View>
+      );
+    }
 
-      <View style={styles.modernContent}>
+    return (
+      <View style={styles.stepContainer}>
+        <View style={styles.modernHeader}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>EUR → HNL from Balance</Text>
+            <Text style={styles.headerSubtitle}>Choose recipient in Honduras</Text>
+          </View>
+          <View style={styles.headerAction} />
+        </View>
+
+        <View style={styles.modernContent}>
         <View style={styles.balanceInfo}>
           <View style={styles.balanceCard}>
             <Ionicons name="wallet" size={24} color="#10B981" />
@@ -277,9 +387,10 @@ export default function EURHNLBalanceRemittanceScreen() {
             </TouchableOpacity>
           </View>
         )}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderAmountStep = () => (
     <View style={styles.stepContainer}>

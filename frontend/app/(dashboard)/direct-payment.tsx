@@ -94,9 +94,9 @@ export default function DirectPaymentScreen() {
     try {
       const response = await apiClient.get('/api/v1/exchange-rates/EUR/HNL');
       if (response.success && response.data?.rate) {
-        // Apply 2.5% margin like production service
+        // Apply 1.5% margin like production service
         const interBankRate = response.data.rate;
-        const customerRate = interBankRate * 0.975; // 2.5% margin
+        const customerRate = interBankRate * 0.985; // 1.5% margin
         setCurrentRate(customerRate);
       }
     } catch (error) {
@@ -192,7 +192,7 @@ export default function DirectPaymentScreen() {
     if (!eur) return { platformFee: 0.99, exchangeMargin: 0, total: 0.99 };
     
     const platformFee = 0.99;
-    const exchangeMargin = eur * 0.025; // 2.5% margin
+    const exchangeMargin = eur * 0.015; // 1.5% margin
     return {
       platformFee,
       exchangeMargin,

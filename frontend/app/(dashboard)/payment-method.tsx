@@ -8,7 +8,7 @@ import { useAuthStore } from '../../lib/auth';
 
 export default function PaymentMethodScreen() {
   const { currency } = useLocalSearchParams<{ currency?: string }>();
-  const { selectedAccount, accounts } = useWalletStore();
+  const { selectedAccount, accounts, refreshBalance } = useWalletStore();
   const { user } = useAuthStore();
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [eurBalance, setEurBalance] = useState<number>(0);
@@ -22,13 +22,47 @@ export default function PaymentMethodScreen() {
     try {
       // Find user's EUR account
       const eurAccount = accounts.find(acc => acc.currency === 'EUR');
-      if (eurAccount && eurAccount.balance) {
-        setEurBalance(parseFloat(eurAccount.balance.amount));
+      if (eurAccount) {
+        console.log('🔍 Found EUR account:', eurAccount.id, 'Loading balance...');
+        
+        // Use the wallet store to refresh the balance
+        await refreshBalance(eurAccount.id);
+        
+        // Get the updated balance from the wallet store
+        const { balance } = useWalletStore.getState();
+        if (balance && balance.amount) {
+          let balanceValue: number;
+          
+          // Handle different balance formats
+          if (typeof balance.amount === 'string') {
+            balanceValue = parseFloat(balance.amount);
+          } else if (typeof balance.amount === 'object' && 'value' in balance.amount) {
+            balanceValue = balance.amount.value;
+          } else if (typeof balance.amount === 'number') {
+            balanceValue = balance.amount;
+          } else {
+            console.warn('⚠️ Balance format unexpected:', balance);
+            setEurBalance(0);
+            return;
+          }
+          
+          if (!isNaN(balanceValue)) {
+            console.log('💰 EUR balance loaded:', balanceValue);
+            setEurBalance(balanceValue);
+          } else {
+            console.warn('⚠️ Could not parse balance value:', balance.amount);
+            setEurBalance(0);
+          }
+        } else {
+          console.warn('⚠️ No balance data found:', balance);
+          setEurBalance(0);
+        }
       } else {
+        console.log('📝 No EUR account found, setting balance to 0');
         setEurBalance(0);
       }
     } catch (error) {
-      console.error('Error loading balance:', error);
+      console.error('❌ Error loading EUR balance:', error);
       setEurBalance(0);
     } finally {
       setIsLoadingBalance(false);
@@ -208,26 +242,6 @@ export default function PaymentMethodScreen() {
               </View>
             </View>
 
-            {/* Quick Stats */}
-            <View style={styles.statsSection}>
-              <Text style={styles.statsTitle}>Trusted by thousands</Text>
-              <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>€2.4M+</Text>
-                  <Text style={styles.statLabel}>Sent this month</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>4.9★</Text>
-                  <Text style={styles.statLabel}>App rating</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{'< 5min'}</Text>
-                  <Text style={styles.statLabel}>Avg delivery</Text>
-                </View>
-              </View>
-            </View>
           </View>
         </View>
       </ScrollView>

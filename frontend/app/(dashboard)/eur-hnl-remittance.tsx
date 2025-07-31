@@ -380,7 +380,7 @@ export default function EURHNLRemittanceScreen() {
 
                 <View style={styles.rateInfo}>
                   <Text style={styles.rateInfoText}>
-                    Rate includes 2.5% exchange margin • Real-time rates from {exchangeRate.source}
+                    Rate includes 1.5% exchange margin • Real-time rates from {exchangeRate.source}
                   </Text>
                 </View>
               </>

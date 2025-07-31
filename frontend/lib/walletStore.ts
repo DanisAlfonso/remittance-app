@@ -50,6 +50,7 @@ interface WalletActions {
   loadAccounts: () => Promise<void>;
   selectAccount: (accountId: string) => void;
   refreshBalance: (accountId?: string) => Promise<void>;
+  updateAccountBalance: (accountId: string, newBalance: number) => void;
   
   // UI state
   clearError: () => void;
@@ -211,6 +212,45 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           // Don't throw the error, just log it
           console.error('Balance refresh error details:', error);
         }
+      },
+
+      updateAccountBalance: (accountId: string, newBalance: number) => {
+        const { accounts, selectedAccount, balance } = get();
+        
+        console.log(`💰 Updating account balance: ${accountId} → ${newBalance}`);
+        
+        // Update the account in the accounts list
+        const updatedAccounts = accounts.map(account => 
+          account.id === accountId 
+            ? { ...account, balance: account.balance ? { ...account.balance, amount: newBalance.toString() } : { amount: newBalance.toString(), currency: account.currency } }
+            : account
+        );
+        
+        // Update the selected account if it matches
+        let updatedSelectedAccount = selectedAccount;
+        if (selectedAccount && selectedAccount.id === accountId) {
+          updatedSelectedAccount = {
+            ...selectedAccount,
+            balance: selectedAccount.balance ? { ...selectedAccount.balance, amount: newBalance.toString() } : { amount: newBalance.toString(), currency: selectedAccount.currency }
+          };
+        }
+        
+        // Update the current balance if it matches
+        let updatedBalance = balance;
+        if (balance && selectedAccount?.id === accountId) {
+          updatedBalance = {
+            ...balance,
+            amount: balance.amount ? { ...balance.amount, value: newBalance } : { value: newBalance, currency: balance.currency }
+          };
+        }
+        
+        set({
+          accounts: updatedAccounts,
+          selectedAccount: updatedSelectedAccount,
+          balance: updatedBalance
+        });
+        
+        console.log(`✅ Account balance updated successfully`);
       },
 
       clearError: () => {

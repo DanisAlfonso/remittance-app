@@ -148,7 +148,7 @@ export class OBPApiService {
   /**
    * Get Direct Login token from OBP-API
    */
-  private async getDirectLoginToken(): Promise<{ success: boolean; token?: string; error?: string }> {
+  async getDirectLoginToken(): Promise<{ success: boolean; token?: string; error?: string }> {
     const tokenUrl = `${this.config.baseUrl}/my/logins/direct`;
     
     try {

@@ -253,10 +253,11 @@ export class OBPApiService {
         throw new Error('No banks available for account creation');
       }
 
-      // Use EURBANK where we have CanCreateAccount permission and BIC routing
-      const targetBank = banksResult.data.find(bank => bank.id === 'EURBANK');
+      // Use the requested bank, or fallback to EURBANK if not specified
+      const requestedBankId = request.bankId || 'EURBANK';
+      const targetBank = banksResult.data.find(bank => bank.id === requestedBankId);
       if (!targetBank) {
-        throw new Error('EURBANK not found - required for account creation with BIC routing');
+        throw new Error(`Bank ${requestedBankId} not found - cannot create account`);
       }
       
       console.log(`🏦 Using bank: ${targetBank.full_name} (${targetBank.id})`);
@@ -904,16 +905,22 @@ export class OBPApiService {
         const accountDetails: BankAccountDetails = {
           id: parseInt(obpAccount.id.replace(/\D/g, '')) || Math.floor(Math.random() * 1000000),
           currency: obpAccount.balance.currency,
-          country: 'ES', // Spanish accounts
+          country: bankId === 'HNLBANK2' ? 'HN' : 'ES', // Honduras for HNLBANK2, Spain for others
           iban: obpAccount.account_routings?.find(r => r.scheme === 'IBAN')?.address || 
-                this.generateIBAN('ES', obpAccount.number),
+                this.generateIBAN(bankId === 'HNLBANK2' ? 'HN' : 'ES', obpAccount.number),
           account_number: obpAccount.number,
           sort_code: obpAccount.account_routings?.find(r => r.scheme === 'SortCode')?.address,
           routing_number: obpAccount.account_routings?.find(r => r.scheme === 'RoutingNumber')?.address,
-          bic: 'ENHBK1XXXX', // Real BIC from Enhanced Bank
-          bank_name: 'Enhanced Test Bank Limited', 
-          bank_address: 'Enhanced Bank Location',
+          bic: bankId === 'HNLBANK2' ? 'ATLHHNXX' : 'ENHBK1XXXX', // Appropriate BIC codes
+          bank_name: bankId === 'HNLBANK2' ? 'Banco Atlántida' : 'Enhanced Test Bank Limited', 
+          bank_address: bankId === 'HNLBANK2' ? 'Tegucigalpa, Honduras' : 'Enhanced Bank Location',
           account_holder_name: obpAccount.label || 'Account Holder',
+          // Include balance information
+          balance: {
+            amount: obpAccount.balance.amount,
+            currency: obpAccount.balance.currency
+          },
+          label: obpAccount.label
         };
         
         return {

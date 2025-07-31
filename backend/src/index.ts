@@ -6,9 +6,9 @@ import { env } from './config/environment';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth';
 import accountsRoutes from './routes/accounts';
-import bankingRoutes from './routes/banking-v2';
 import obpRoutes from './routes/obp-v5';
 import usersRoutes from './routes/users';
+import remittanceRoutes from './routes/remittance';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -58,8 +58,8 @@ app.use('/obp/v5.1.0/banks', obpRoutes); // Bank operations and transactions
 app.use('/obp/v5.1.0/management/users', usersRoutes); // User management (admin)
 app.use('/obp/v5.1.0', obpRoutes); // Additional OBP endpoints (users/current, transaction-requests)
 
-// Legacy endpoints (deprecated)
-app.use('/api/v1/banking', bankingRoutes); // TODO: Remove after migration
+// Remittance endpoints (OBP-API v5.1.0 compliant)
+app.use('/obp/v5.1.0/remittance', remittanceRoutes); // EUR → HNL remittances
 
 app.use((req, res, next) => {
   notFoundHandler(req, res);

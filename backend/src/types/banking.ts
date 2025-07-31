@@ -97,8 +97,9 @@ export interface CreateBankAccountRequest {
   userId: string;
   currency: string;
   country: string;
-  type: 'SAVINGS' | 'CHECKING';
+  type: 'SAVINGS' | 'CHECKING' | 'CURRENT';
   name: string;
+  bankId?: string; // Optional bank ID to specify which bank to create account in
 }
 
 export interface BankAccountDetails {
@@ -114,4 +115,9 @@ export interface BankAccountDetails {
   bank_address?: string;
   account_holder_name: string;
   account_holder_address?: string;
+  balance?: {
+    amount: string;
+    currency: string;
+  };
+  label?: string;
 }

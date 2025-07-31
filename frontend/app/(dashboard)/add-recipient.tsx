@@ -317,7 +317,7 @@ export default function AddRecipientScreen() {
         </View>
       </ScrollView>
 
-        {/* Modern Action Buttons */}
+        {/* Modern Action Button */}
         <View style={styles.modernActionButtons}>
           <Button
             title="Continue to Amount"
@@ -325,14 +325,6 @@ export default function AddRecipientScreen() {
             loading={isValidating}
             style={styles.modernContinueButton}
             textStyle={styles.modernContinueButtonText}
-          />
-          
-          <Button
-            title="Cancel"
-            onPress={() => router.back()}
-            variant="outline"
-            style={styles.modernCancelButton}
-            textStyle={styles.modernCancelButtonText}
           />
         </View>
     </SafeAreaView>
@@ -573,10 +565,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // 🎯 Modern Action Buttons
+  // 🎯 Modern Action Button
   modernActionButtons: {
     padding: 16,
-    gap: 12,
     backgroundColor: '#F8FAFC',
   },
   modernContinueButton: {
@@ -593,22 +584,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
-  },
-  modernCancelButton: {
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    shadowColor: '#1E3A8A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  modernCancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
   },
 });

@@ -411,10 +411,22 @@ export default function DashboardScreen() {
                   styles.actionButton, 
                   selectedAccount?.currency === 'HNL' ? styles.hnlSendAction : styles.primaryAction
                 ]}
-                onPress={() => router.push({
-                  pathname: '/(dashboard)/send-money',
-                  params: { currency: selectedAccount?.currency || 'EUR' }
-                })}
+                onPress={() => {
+                  const currency = selectedAccount?.currency || 'EUR';
+                  if (currency === 'EUR') {
+                    // Route to new payment method selection for EUR
+                    router.push({
+                      pathname: '/(dashboard)/payment-method',
+                      params: { currency: 'EUR' }
+                    });
+                  } else {
+                    // Route to existing send-money flow for other currencies
+                    router.push({
+                      pathname: '/(dashboard)/send-money',
+                      params: { currency: currency }
+                    });
+                  }
+                }}
               >
                 <View style={styles.actionIconContainer}>
                   <Ionicons name="paper-plane" size={24} color="#FFFFFF" />
@@ -779,6 +791,8 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     color: '#3B82F6',
   },
+
+  // Remittance styles removed - now handled by payment method selection
 
   // No Accounts Prompt
   noAccountsPrompt: {

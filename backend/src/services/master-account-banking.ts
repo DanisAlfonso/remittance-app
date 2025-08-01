@@ -55,6 +55,8 @@ interface InboundTransferRequest {
   currency: SupportedCurrency;
   senderDetails: {
     name: string;
+    userId?: string;
+    username?: string;
     iban?: string;
     reference?: string;
   };
@@ -201,6 +203,15 @@ export class MasterAccountBankingService {
           amount: request.amount,
           currency: request.currency,
           referenceNumber,
+          description: `Received from ${request.senderDetails.name}`,
+          metadata: JSON.stringify({
+            senderName: request.senderDetails.name,
+            senderUserId: request.senderDetails.userId,
+            senderUsername: request.senderDetails.username,
+            senderIban: request.senderDetails.iban,
+            isInternalTransfer: !!request.senderDetails.userId,
+            transferPurpose: request.senderDetails.reference || 'Money transfer'
+          }),
           createdAt: new Date(),
           completedAt: new Date()
         }
@@ -257,6 +268,53 @@ export class MasterAccountBankingService {
       });
       
       // Record the outbound transfer
+      console.log(`💾 Creating transaction record with recipient info:`, {
+        recipientName: request.recipientName,
+        recipientIBAN: request.recipientIBAN,
+        description: `Transfer to ${request.recipientName}`
+      });
+      
+      // Check if this is an internal transfer (recipient IBAN belongs to our system)
+      const recipientAccount = await tx.bankAccount.findFirst({
+        where: {
+          iban: request.recipientIBAN,
+          status: 'ACTIVE',
+          accountType: 'virtual_remittance'
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true
+            }
+          }
+        }
+      });
+      
+      // Prepare comprehensive recipient metadata
+      let recipientUserId = null;
+      let recipientUsername = null;
+      let isInternalUser = false;
+      
+      if (recipientAccount) {
+        // This is an internal user
+        recipientUserId = recipientAccount.user.id;
+        recipientUsername = recipientAccount.user.username;
+        isInternalUser = true;
+      }
+      
+      // Store comprehensive recipient info in metadata as JSON
+      const recipientMetadata = {
+        recipientName: request.recipientName,
+        recipientIban: request.recipientIBAN,
+        recipientUserId: recipientUserId,
+        recipientUsername: recipientUsername,
+        isInternalUser: isInternalUser,
+        transferPurpose: request.transferPurpose || 'Money transfer',
+        transferAmount: request.amount,
+        transferCurrency: request.currency
+      };
+      
       await tx.transaction.create({
         data: {
           userId: request.fromUserId,
@@ -268,18 +326,13 @@ export class MasterAccountBankingService {
           providerFee: fees.processingFee,
           totalFee: fees.totalFee,
           referenceNumber,
+          description: `Transfer to ${request.recipientName}`,
+          metadata: JSON.stringify(recipientMetadata),
           createdAt: new Date()
         }
       });
       
-      // Check if this is an internal transfer (recipient IBAN belongs to our system)
-      const recipientAccount = await tx.bankAccount.findFirst({
-        where: {
-          iban: request.recipientIBAN,
-          status: 'ACTIVE',
-          accountType: 'virtual_remittance'
-        }
-      });
+      console.log(`✅ Transaction record created successfully with reference: ${referenceNumber}`);
       
       if (recipientAccount) {
         // INTERNAL TRANSFER: Skip OBP-API, money stays within our system

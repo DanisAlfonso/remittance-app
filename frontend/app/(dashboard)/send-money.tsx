@@ -6,7 +6,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWalletStore } from '../../lib/walletStore';
 import { useAuthStore } from '../../lib/auth';
-import { apiClient } from '../../lib/api';
+// import { apiClient } from '../../lib/api';
+import { transferService } from '../../lib/transfer';
+import type { Transfer } from '../../types/transfer';
 
 type FlowStep = 'recipients' | 'currency' | 'method' | 'amount' | 'processing';
 
@@ -20,6 +22,14 @@ interface Recipient {
   lastUsed: string;
   isFavorite?: boolean;
   isInternational?: boolean;
+  // Enhanced fields for better handling
+  userId?: string | null;
+  username?: string | null;
+  isInternalUser?: boolean;
+  lastTransferAmount?: number;
+  transferId?: string;
+  sourceAmount?: number;
+  sourceCurrency?: string;
 }
 
 export default function SendMoneyScreen() {
@@ -73,69 +83,122 @@ export default function SendMoneyScreen() {
     
     setIsLoadingRecipients(true);
     try {
-      // Fetch user's transfer history from OBP transaction requests
-      const response = await apiClient.obpGet('/obp/v5.1.0/transaction-requests', {
-        headers: { Authorization: `Bearer ${token}` }
+      console.log('🔍 Loading recent recipients from transfer history...');
+      
+      // Use the proper transfer service to get transfer history
+      const response = await transferService.getTransferHistory(10, 0); // Get last 10 transfers
+      const transfers = response.transfers || [];
+      
+      console.log('📋 Found', transfers.length, 'transfers');
+      transfers.forEach((transfer, index) => {
+        console.log(`Transfer ${index}:`, {
+          id: transfer.id,
+          sourceAmount: transfer.sourceAmount,
+          targetCurrency: transfer.targetCurrency,
+          recipient: transfer.recipient,
+          description: transfer.description,
+          createdAt: transfer.createdAt
+        });
       });
       
-      const transfers = (response as { transfers: Array<{
-        recipient?: {
-          name?: string;
-          email?: string;
-          iban?: string;
-          accountNumber?: string;
-          bankName?: string;
-        };
-        targetCurrency: string;
-        sourceCurrency: string;
-        createdAt: string;
-        sourceAmount: number;
-      }> }).transfers || [];
-      
-      // Extract unique recipients from transfers
+      // Extract unique recipients from outgoing transfers
       const recipientMap = new Map<string, Recipient>();
       
-      transfers.forEach((transfer: {
-        recipient?: {
-          name?: string;
-          email?: string;
-          iban?: string;
-          accountNumber?: string;
-          bankName?: string;
-        };
-        targetCurrency: string;
-        sourceCurrency: string;
-        createdAt: string;
-        sourceAmount: number;
-      }) => {
+      transfers.forEach((transfer: Transfer) => {
         // Only include outgoing transfers (sent money) where sourceAmount is negative
-        if (transfer.sourceAmount < 0 && transfer.recipient && transfer.recipient.name) {
-          const recipientKey = transfer.recipient.iban || transfer.recipient.accountNumber || transfer.recipient.name;
-          const existing = recipientMap.get(recipientKey);
+        if (transfer.sourceAmount < 0) {
+          let recipientName = '';
+          let recipientIban = '';
+          let recipientAccountNumber = '';
+          let recipientUserId = null;
+          let recipientUsername = null;
+          let isInternalUser = false;
+          let lastTransferAmount = 0;
           
-          // Keep the most recent transfer for each recipient
-          if (!existing || new Date(transfer.createdAt) > new Date(existing.lastUsed)) {
-            const recipientCountry = getCountryFromCurrency(transfer.targetCurrency);
-            recipientMap.set(recipientKey, {
-              id: recipientKey,
-              name: transfer.recipient.name,
-              email: transfer.recipient.email,
-              iban: transfer.recipient.iban,
-              currency: transfer.targetCurrency,
-              country: recipientCountry,
-              lastUsed: formatRelativeTime(transfer.createdAt),
-              isFavorite: favoriteRecipients.has(recipientKey),
-              isInternational: recipientCountry !== 'EU' && recipientCountry !== getCountryFromCurrency(selectedAccount?.currency || 'EUR')
-            });
+          // First, try to extract enhanced metadata if available (new transactions will have this)
+          if (transfer.metadata) {
+            try {
+              const metadata = JSON.parse(transfer.metadata);
+              if (metadata.recipientName) {
+                recipientName = metadata.recipientName;
+                recipientIban = metadata.recipientIban || '';
+                recipientUserId = metadata.recipientUserId;
+                recipientUsername = metadata.recipientUsername;
+                isInternalUser = metadata.isInternalUser || false;
+                lastTransferAmount = metadata.transferAmount || 0;
+              }
+            } catch {
+              // Metadata not JSON, continue with fallback methods
+            }
+          }
+          
+          // Fallback to existing extraction methods if metadata didn't provide info
+          if (!recipientName) {
+            // Primary: Try to get recipient info from recipient object
+            if (transfer.recipient?.name) {
+              recipientName = transfer.recipient.name;
+              recipientIban = transfer.recipient.iban || '';
+              recipientAccountNumber = transfer.recipient.accountNumber || '';
+            }
+            // Fallback 1: Try to extract from reference field
+            else if (transfer.reference?.includes('Transfer to')) {
+              recipientName = transfer.reference.replace('Transfer to ', '').trim();
+            }
+            // Fallback 2: Try to extract from description field  
+            else if (transfer.description?.includes('to ')) {
+              const parts = transfer.description.split(' to ');
+              if (parts.length > 1) {
+                recipientName = parts[1].trim();
+              }
+            }
+            // Fallback 3: Try to extract recipient name from description patterns
+            else if (transfer.description) {
+              // Look for patterns like "EUR → HNL remittance to [Name]"
+              const toMatch = transfer.description.match(/to\s+([^-]+)/i);
+              if (toMatch) {
+                recipientName = toMatch[1].trim();
+              }
+            }
+          }
+          
+          // Only proceed if we have a recipient name
+          if (recipientName) {
+            const recipientKey = recipientIban || recipientAccountNumber || recipientName;
+            const existing = recipientMap.get(recipientKey);
+            
+            // Keep the most recent transfer for each recipient
+            if (!existing || new Date(transfer.createdAt) > new Date(existing.lastUsed)) {
+              const recipientCountry = getCountryFromCurrency(transfer.targetCurrency);
+              recipientMap.set(recipientKey, {
+                id: recipientKey,
+                name: recipientName,
+                email: recipientName, // Use name as fallback for email
+                iban: recipientIban,
+                currency: transfer.targetCurrency,
+                country: recipientCountry,
+                lastUsed: formatRelativeTime(transfer.createdAt),
+                isFavorite: favoriteRecipients.has(recipientKey),
+                isInternational: recipientCountry !== 'EU' && recipientCountry !== getCountryFromCurrency(selectedAccount?.currency || 'EUR'),
+                // Enhanced fields for better handling
+                userId: recipientUserId,
+                username: recipientUsername,
+                isInternalUser: isInternalUser,
+                lastTransferAmount: lastTransferAmount,
+                transferId: transfer.id,
+                sourceAmount: Math.abs(transfer.sourceAmount || 0),
+                sourceCurrency: transfer.sourceCurrency
+              });
+            }
           }
         }
       });
       
       // Convert to array and sort by most recent
       const recipients = Array.from(recipientMap.values()).slice(0, 5); // Show max 5 recent recipients
+      console.log('✅ Extracted', recipients.length, 'unique recipients:', recipients.map(r => r.name));
       setRecentRecipients(recipients);
     } catch (error) {
-      console.error('Error loading recent recipients:', error);
+      console.error('❌ Error loading recent recipients:', error);
       // Don't show error to user - just show empty list
       setRecentRecipients([]);
     } finally {
@@ -219,6 +282,83 @@ export default function SendMoneyScreen() {
       router.push({
         pathname: '/(dashboard)/user-search',
         params: { currency: selectedCurrency }
+      });
+    }
+  };
+
+  const handleSendAgain = (recipient: Recipient) => {
+    console.log('🔄 Send Again pressed for:', recipient.name);
+    
+    // Navigate directly to transfer amount with pre-filled amount and recipient
+    if (recipient.isInternalUser && recipient.userId) {
+      // Internal user - use @username transfer
+      router.push({
+        pathname: '/(dashboard)/transfer-amount',
+        params: {
+          recipientId: recipient.userId,
+          recipientName: recipient.name,
+          recipientUsername: recipient.username || '',
+          transferType: 'user', // @username transfer
+          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR',
+          prefillAmount: recipient.lastTransferAmount?.toString() || '',
+          fromSendAgain: 'true'
+        }
+      });
+    } else {
+      // External recipient - use IBAN transfer
+      const recipientData = {
+        type: 'iban',
+        holderName: recipient.name,
+        iban: recipient.iban || '',
+        currency: recipient.currency,
+        country: recipient.country,
+        bankName: 'Bank Transfer',
+      };
+      
+      router.push({
+        pathname: '/(dashboard)/transfer-amount',
+        params: {
+          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR',
+          recipientData: JSON.stringify(recipientData),
+          prefillAmount: recipient.lastTransferAmount?.toString() || '',
+          fromSendAgain: 'true'
+        }
+      });
+    }
+  };
+
+  const handleRecipientCardPress = (recipient: Recipient) => {
+    console.log('💳 Recipient card pressed:', recipient.name, 'isInternalUser:', recipient.isInternalUser);
+    
+    if (recipient.isInternalUser && recipient.userId) {
+      // Internal user - use @username transfer for proper handling
+      router.push({
+        pathname: '/(dashboard)/transfer-amount',
+        params: {
+          recipientId: recipient.userId,
+          recipientName: recipient.name,
+          recipientUsername: recipient.username || '',
+          transferType: 'user', // @username transfer
+          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR'
+        }
+      });
+    } else {
+      // External recipient - use IBAN transfer
+      const recipientData = {
+        type: 'iban',
+        holderName: recipient.name,
+        iban: recipient.iban || '',
+        currency: recipient.currency,
+        country: recipient.country,
+        bankName: 'Bank Transfer',
+      };
+      
+      router.push({
+        pathname: '/(dashboard)/transfer-amount',
+        params: {
+          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR',
+          recipientData: JSON.stringify(recipientData)
+        }
       });
     }
   };
@@ -469,22 +609,7 @@ export default function SendMoneyScreen() {
                     { marginBottom: index === getFilteredRecipients().length - 1 ? 0 : 12 }
                   ]}
                   onPress={() => {
-                    const recipientData = {
-                      type: 'iban',
-                      holderName: recipient.name,
-                      iban: recipient.iban,
-                      currency: recipient.currency,
-                      country: recipient.country,
-                      bankName: 'Bank Transfer',
-                    };
-                    
-                    router.push({
-                      pathname: '/(dashboard)/transfer-amount',
-                      params: {
-                        currency: recipient.currency,
-                        recipientData: JSON.stringify(recipientData)
-                      }
-                    });
+                    handleRecipientCardPress(recipient);
                   }}
                   activeOpacity={0.98}
                 >
@@ -528,7 +653,13 @@ export default function SendMoneyScreen() {
                             color={recipient.isFavorite ? "#F59E0B" : "#9CA3AF"} 
                           />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.sendAgainButton}>
+                        <TouchableOpacity 
+                          style={styles.sendAgainButton}
+                          onPress={(e) => {
+                            e.stopPropagation(); // Prevent triggering the main card press
+                            handleSendAgain(recipient);
+                          }}
+                        >
                           <Ionicons name="repeat" size={16} color="#3B82F6" />
                           <Text style={styles.sendAgainText}>Send Again</Text>
                         </TouchableOpacity>

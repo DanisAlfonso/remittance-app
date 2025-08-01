@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { transferService } from '../../lib/transfer';
 import type { Transfer } from '../../types/transfer';
+import { getTransferType, getTransferDisplayName, getTransferTypeText, formatTransferAmount } from '../../lib/transferUtils';
 
 export default function TransactionsScreen() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
@@ -74,16 +75,7 @@ export default function TransactionsScreen() {
     setShowFilterModal(false);
   };
 
-  const formatCurrency = (amount: number, currencyCode: string): string => {
-    const currencySymbols: Record<string, string> = {
-      'EUR': '€',
-      'USD': '$',
-      'HNL': 'L', // Honduran Lempira
-    };
-    
-    const symbol = currencySymbols[currencyCode] || currencyCode;
-    return `${symbol}${amount.toFixed(2)}`;
-  };
+  // Using formatTransferAmount from transferUtils
 
   const calculateSummary = () => {
     let totalSent = 0;
@@ -108,40 +100,7 @@ export default function TransactionsScreen() {
     return { totalSent, totalReceived, primaryCurrency };
   };
 
-  const getTransferType = (transfer: Transfer): 'send' | 'receive' => {
-    // If sourceAmount is positive, it's an incoming transfer (deposit)
-    // If sourceAmount is negative, it's an outgoing transfer
-    return transfer.sourceAmount > 0 ? 'receive' : 'send';
-  };
-
-  const getRecipientName = (transfer: Transfer): string => {
-    if (getTransferType(transfer) === 'receive') {
-      // For incoming transfers, try to extract sender name from description
-      if (transfer.description?.includes('Transfer from')) {
-        const senderName = transfer.description.replace('Transfer from ', '').trim();
-        return senderName || 'App user';
-      }
-      // Try to get from reference field
-      if (transfer.reference?.includes('Transfer from')) {
-        const senderName = transfer.reference.replace('Transfer from ', '').trim();
-        return senderName || 'App user';
-      }
-      return 'App user';
-    }
-    
-    // For outgoing transfers, show recipient name
-    if (transfer.recipient?.name) {
-      return transfer.recipient.name;
-    }
-    
-    // Fallback to extracting from reference
-    if (transfer.reference?.includes('Transfer to')) {
-      const recipientName = transfer.reference.replace('Transfer to ', '').trim();
-      return recipientName || 'Recipient';
-    }
-    
-    return 'Recipient';
-  };
+  // Using shared utility functions from transferUtils
 
   const getStatusColor = (status: string | undefined) => {
     if (!status) {
@@ -172,7 +131,7 @@ export default function TransactionsScreen() {
 
   const renderTransaction = ({ item }: { item: Transfer }) => {
     const transferType = getTransferType(item);
-    const recipientName = getRecipientName(item);
+    const displayName = getTransferDisplayName(item);
     const amount = Math.abs(Number(item.sourceAmount) || 0);
     const currency = item.sourceCurrency;
     
@@ -193,9 +152,9 @@ export default function TransactionsScreen() {
         
         <View style={styles.transactionDetails}>
           <View style={styles.transactionMainInfo}>
-            <Text style={styles.modernRecipientName}>{recipientName}</Text>
+            <Text style={styles.modernRecipientName}>{displayName}</Text>
             <Text style={styles.modernTransactionType}>
-              {transferType === 'send' ? 'Money sent' : 'Money received'}
+              {getTransferTypeText(item)}
             </Text>
             <View style={styles.transactionMetadata}>
               <Text style={styles.modernDate}>
@@ -230,7 +189,7 @@ export default function TransactionsScreen() {
               styles.modernAmount,
               { color: transferType === 'send' ? '#3B82F6' : '#10B981' }
             ]}>
-              {transferType === 'send' ? '-' : '+'}{formatCurrency(amount, currency)}
+              {transferType === 'send' ? '-' : '+'}{formatTransferAmount(amount, currency)}
             </Text>
             <Text style={styles.modernCurrency}>{currency}</Text>
           </View>
@@ -271,7 +230,7 @@ export default function TransactionsScreen() {
             </View>
             <Text style={styles.summaryTitleModern}>Total Sent</Text>
           </View>
-          <Text style={styles.summaryValueModern}>{formatCurrency(calculateSummary().totalSent, calculateSummary().primaryCurrency)}</Text>
+          <Text style={styles.summaryValueModern}>{formatTransferAmount(calculateSummary().totalSent, calculateSummary().primaryCurrency)}</Text>
           <Text style={styles.summarySubtext}>This month</Text>
         </View>
         
@@ -282,7 +241,7 @@ export default function TransactionsScreen() {
             </View>
             <Text style={styles.summaryTitleModern}>Total Received</Text>
           </View>
-          <Text style={styles.summaryValueModern}>{formatCurrency(calculateSummary().totalReceived, calculateSummary().primaryCurrency)}</Text>
+          <Text style={styles.summaryValueModern}>{formatTransferAmount(calculateSummary().totalReceived, calculateSummary().primaryCurrency)}</Text>
           <Text style={styles.summarySubtext}>This month</Text>
         </View>
       </View>

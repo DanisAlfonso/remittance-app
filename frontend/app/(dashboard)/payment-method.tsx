@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWalletStore } from '../../lib/walletStore';
-import { useAuthStore } from '../../lib/auth';
+// import { useAuthStore } from '../../lib/auth';
 
 export default function PaymentMethodScreen() {
   const { selectedAccount, accounts, refreshBalance } = useWalletStore();
-  const { user } = useAuthStore();
+  // const { user } = useAuthStore(); // Commented out as not used
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [eurBalance, setEurBalance] = useState<number>(0);
 
@@ -35,8 +35,8 @@ export default function PaymentMethodScreen() {
           // Handle different balance formats
           if (typeof balance.amount === 'string') {
             balanceValue = parseFloat(balance.amount);
-          } else if (typeof balance.amount === 'object' && 'value' in balance.amount) {
-            balanceValue = balance.amount.value;
+          } else if (typeof balance.amount === 'object' && balance.amount && 'value' in balance.amount) {
+            balanceValue = (balance.amount as { value: number }).value;
           } else if (typeof balance.amount === 'number') {
             balanceValue = balance.amount;
           } else {
@@ -74,7 +74,7 @@ export default function PaymentMethodScreen() {
         'Insufficient Balance',
         'You need to add funds to your EUR account first.',
         [
-          { text: 'Add Funds', onPress: () => router.push('/(dashboard)/add-funds') },
+          { text: 'Add Funds', onPress: () => router.back() }, // TODO: Create add-funds route
           { text: 'Cancel', style: 'cancel' }
         ]
       );

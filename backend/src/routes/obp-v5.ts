@@ -270,7 +270,7 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
     console.log(`📊 Found ${transactions.length} transactions in database for user ${userId}`);
     
     // Transform database transactions to frontend Transfer format
-    const transfers = transactions.map((tx) => {
+    const transfers = await Promise.all(transactions.map(async (tx) => {
       // Determine amount sign based on transaction type
       const amount = parseFloat(tx.amount.toString());
       let sourceAmount: number;
@@ -300,6 +300,64 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
       
       console.log(`✅ Final amount for transaction ${tx.id}: ${sourceAmount} (type: ${tx.type})`);
       
+      // Extract recipient information from stored transaction data
+      let recipientName = 'Unknown Recipient';
+      let recipientAccountNumber = '';
+      
+      // First, try to extract from metadata JSON
+      if (tx.metadata) {
+        try {
+          const metadata = JSON.parse(tx.metadata);
+          // For inbound transfers, we want to show the sender's name
+          if (tx.type === 'INBOUND_TRANSFER' && metadata.senderName) {
+            recipientName = metadata.senderName;
+            recipientAccountNumber = metadata.senderIban || '';
+          }
+          // For outbound transfers, we want to show the recipient's name
+          else if (metadata.recipientName) {
+            recipientName = metadata.recipientName;
+            recipientAccountNumber = metadata.recipientIban || '';
+          }
+        } catch {
+          // Metadata is not JSON, ignore
+        }
+      }
+      
+      // If no metadata, try to extract from description
+      if (recipientName === 'Unknown Recipient' && tx.description) {
+        let namePart = '';
+        if (tx.type === 'INBOUND_TRANSFER' && tx.description.includes('Received from ')) {
+          namePart = tx.description.replace('Received from ', '').trim();
+        } else if (tx.description.includes('Transfer to ')) {
+          namePart = tx.description.replace('Transfer to ', '').trim();
+        }
+        
+        if (namePart && namePart.length > 2) {
+          recipientName = namePart;
+        }
+      }
+      
+      // If still no recipient info, fallback based on transaction type
+      if (recipientName === 'Unknown Recipient') {
+        switch (tx.type) {
+          case 'OUTBOUND_TRANSFER':
+            recipientName = 'External Account';
+            break;
+          case 'INBOUND_TRANSFER':
+            recipientName = 'External Sender';
+            break;
+          case 'WITHDRAWAL':
+            recipientName = 'Cash Withdrawal';
+            break;
+          case 'DEPOSIT':
+            recipientName = 'Cash Deposit';
+            break;
+          default:
+            recipientName = 'Transfer';
+            break;
+        }
+      }
+
       return {
         id: tx.referenceNumber || tx.id.toString(),
         sourceAccountId: 'master-account', // Placeholder for required field
@@ -316,16 +374,17 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
         exchangeRate: 1, // No exchange for same currency
         fee: tx.totalFee ? parseFloat(tx.totalFee.toString()) : 0,
         reference: tx.referenceNumber || undefined,
-        description: `${tx.type || 'Transfer'} - ${tx.currency || 'EUR'} ${tx.amount}`,
+        description: tx.description || `${tx.type || 'Transfer'} - ${tx.currency || 'EUR'} ${tx.amount}`,
         createdAt: tx.createdAt.toISOString(),
         updatedAt: tx.createdAt.toISOString(), // Use same as created for now
         completedAt: tx.completedAt?.toISOString() || undefined,
         recipient: {
-          name: 'Transfer', // Would need to be enhanced with actual recipient data
-          accountNumber: ''
+          name: recipientName,
+          accountNumber: recipientAccountNumber,
+          iban: recipientAccountNumber || undefined
         }
       };
-    });
+    }));
     
     console.log(`✅ Found ${transfers.length} transactions for user ${userId}`);
     
@@ -663,6 +722,38 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
         // Import internal banking service
         const { masterAccountBanking } = await import('../services/master-account-banking.js');
         
+        // Get sender user details for proper transaction history
+        const senderUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { 
+            firstName: true, 
+            lastName: true, 
+            username: true,
+            email: true 
+          }
+        });
+        
+        if (!senderUser) {
+          console.error(`❌ Sender user not found: ${userId}`);
+          res.status(404).json({
+            error: {
+              error_code: 'OBP-40000',
+              error_message: 'Sender user not found'
+            }
+          });
+          return;
+        }
+        
+        // Get sender's IBAN for the same currency
+        const senderAccount = await prisma.bankAccount.findFirst({
+          where: {
+            userId: userId,
+            currency: transferData.transferDetails.currency,
+            status: 'ACTIVE',
+            accountType: 'virtual_remittance'
+          }
+        });
+        
         // Execute outbound transfer (debit sender)
         console.log(`🔽 Step 1: Executing outbound transfer (debit sender)...`);
         console.log(`🔽 Using recipient IBAN: ${recipientAccount.iban} (${recipientAccount.currency} account)`);
@@ -685,7 +776,10 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
           amount: transferData.transferDetails.amount,
           currency: transferData.transferDetails.currency as 'EUR' | 'HNL',
           senderDetails: {
-            name: 'Internal Transfer',
+            name: `${senderUser.firstName} ${senderUser.lastName}`,
+            userId: userId,
+            username: senderUser.username || undefined,
+            iban: senderAccount?.iban || undefined,
             reference: transferData.transferDetails.reference
           }
         });
@@ -812,6 +906,38 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
             console.log(`💫 Transfer details: ${userId} → ${recipientAccount.userId} (${transferData.transferDetails.amount} ${transferData.transferDetails.currency})`);
             
             try {
+              // Get sender user details for proper transaction history
+              const senderUser = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { 
+                  firstName: true, 
+                  lastName: true, 
+                  username: true,
+                  email: true 
+                }
+              });
+              
+              if (!senderUser) {
+                console.error(`❌ Sender user not found: ${userId}`);
+                res.status(404).json({
+                  error: {
+                    error_code: 'OBP-40000',
+                    error_message: 'Sender user not found'
+                  }
+                });
+                return;
+              }
+              
+              // Get sender's IBAN for the same currency
+              const senderAccount = await prisma.bankAccount.findFirst({
+                where: {
+                  userId: userId,
+                  currency: transferData.transferDetails.currency,
+                  status: 'ACTIVE',
+                  accountType: 'virtual_remittance'
+                }
+              });
+              
               // Execute both outbound (debit sender) and inbound (credit recipient) transfers
               console.log(`🔽 Step 1: Executing outbound transfer (debit sender)...`);
               console.log(`🔽 Outbound params:`, {
@@ -843,7 +969,10 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
                 amount: transferData.transferDetails.amount,
                 currency: transferData.transferDetails.currency,
                 senderDetails: {
-                  name: 'Internal Transfer',
+                  name: `${senderUser.firstName} ${senderUser.lastName}`,
+                  userId: userId,
+                  username: senderUser.username || undefined,
+                  iban: senderAccount?.iban || undefined,
                   reference: transferData.transferDetails.reference
                 }
               });
@@ -853,7 +982,10 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
                 amount: transferData.transferDetails.amount,
                 currency: transferData.transferDetails.currency as 'EUR' | 'HNL',
                 senderDetails: {
-                  name: 'Internal Transfer',
+                  name: `${senderUser.firstName} ${senderUser.lastName}`,
+                  userId: userId,
+                  username: senderUser.username || undefined,
+                  iban: senderAccount?.iban || undefined,
                   reference: transferData.transferDetails.reference
                 }
               });

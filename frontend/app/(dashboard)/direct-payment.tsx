@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../../lib/auth';
+// import { useAuthStore } from '../../lib/auth';
 import { apiClient } from '../../lib/api';
 
 type FlowStep = 'recipients' | 'amount' | 'payment' | 'processing' | 'success';
@@ -38,7 +38,7 @@ interface DirectPaymentResult {
 }
 
 export default function DirectPaymentScreen() {
-  const { user, token } = useAuthStore();
+  // const { user, token } = useAuthStore(); // Commented out as not used
   const [step, setStep] = useState<FlowStep>('recipients');
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
@@ -63,12 +63,23 @@ export default function DirectPaymentScreen() {
     setIsLoadingRecipients(true);
     try {
       // Load HNL recipients from beneficiaries
-      const response = await apiClient.get('/api/v1/beneficiaries');
+      const response = await apiClient.get('/api/v1/beneficiaries') as {
+        success: boolean;
+        data?: {
+          beneficiaries: Array<{
+            currency: string;
+            accountNumber: string;
+            firstName: string;
+            lastName: string;
+            bankName: string;
+          }>;
+        };
+      };
       
       if (response.success && response.data?.beneficiaries) {
         const hnlRecipients = response.data.beneficiaries
-          .filter((b: { currency: string }) => b.currency === 'HNL')
-          .map((b: { accountNumber: string; firstName: string; lastName: string; bankName: string }) => ({
+          .filter((b) => b.currency === 'HNL')
+          .map((b) => ({
             id: b.accountNumber,
             name: `${b.firstName} ${b.lastName}`,
             accountNumber: b.accountNumber,
@@ -91,7 +102,10 @@ export default function DirectPaymentScreen() {
   const loadExchangeRate = async () => {
     setIsLoadingRate(true);
     try {
-      const response = await apiClient.get('/api/v1/exchange-rates/EUR/HNL');
+      const response = await apiClient.get('/api/v1/exchange-rates/EUR/HNL') as {
+        success: boolean;
+        data?: { rate: number };
+      };
       if (response.success && response.data?.rate) {
         // Apply 1.5% margin like production service
         const interBankRate = response.data.rate;
@@ -140,7 +154,23 @@ export default function DirectPaymentScreen() {
         amountEUR: parseFloat(amount),
         description: `Direct payment to ${selectedRecipient.name} - €${amount}`,
         recipientName: selectedRecipient.name
-      });
+      }) as {
+        success: boolean;
+        data?: {
+          transactionId: string;
+          eurDeducted: number;
+          hnlDeposited: number;
+          exchangeRate: number;
+          fees: {
+            platformFee: number;
+            exchangeMargin: number;
+            totalFee: number;
+          };
+        };
+        error?: {
+          message: string;
+        };
+      };
 
       if (response.success && response.data) {
         setPaymentResult({

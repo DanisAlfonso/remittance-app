@@ -45,11 +45,11 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
       style={[
         styles.skeleton,
         {
-          width,
+          width: width as number | string,
           height,
           borderRadius,
           opacity,
-        },
+        } as ViewStyle,
         style,
       ]}
     />

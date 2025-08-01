@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { getCurrencySymbol } from './transferUtils';
 import type { 
   BankAccount, 
   CreateBankAccountRequest,
@@ -93,20 +94,7 @@ export class BankingService {
    * Get currency symbol
    */
   getCurrencySymbol(currency: string): string {
-    const symbols: Record<string, string> = {
-      USD: '$',
-      EUR: '€',
-      GBP: '£',
-      CAD: 'C$',
-      AUD: 'A$',
-      JPY: '¥',
-      CHF: 'Fr',
-      CNY: '¥',
-      SEK: 'kr',
-      NZD: 'NZ$',
-    };
-    
-    return symbols[currency] || currency;
+    return getCurrencySymbol(currency);
   }
 
   /**

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { formatTransferAmount } from '../../lib/transferUtils';
 import Button from '../../components/ui/Button';
 
 export default function RemittanceSuccessScreen() {
@@ -14,10 +15,6 @@ export default function RemittanceSuccessScreen() {
   const recipientName = params.recipientName as string;
   const exchangeRate = parseFloat(params.exchangeRate as string || '0');
 
-  const formatCurrency = (value: number, currencyCode: string): string => {
-    const symbols: Record<string, string> = { 'EUR': '€', 'HNL': 'L.' };
-    return `${symbols[currencyCode] || currencyCode}${value.toFixed(2)}`;
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -38,7 +35,7 @@ export default function RemittanceSuccessScreen() {
           <View style={styles.amountFlow}>
             <View style={styles.amountBox}>
               <Text style={styles.amountLabel}>You sent</Text>
-              <Text style={styles.amountEUR}>{formatCurrency(amountEUR, 'EUR')}</Text>
+              <Text style={styles.amountEUR}>{formatTransferAmount(amountEUR, 'EUR')}</Text>
             </View>
             
             <View style={styles.arrowContainer}>
@@ -47,7 +44,7 @@ export default function RemittanceSuccessScreen() {
             
             <View style={styles.amountBox}>
               <Text style={styles.amountLabel}>Recipient gets</Text>
-              <Text style={styles.amountHNL}>{formatCurrency(amountHNL, 'HNL')}</Text>
+              <Text style={styles.amountHNL}>{formatTransferAmount(amountHNL, 'HNL')}</Text>
             </View>
           </View>
 

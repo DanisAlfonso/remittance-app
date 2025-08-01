@@ -37,6 +37,14 @@ jest.mock('expo-router', () => ({
   usePathname: () => '/test',
   useLocalSearchParams: () => ({}),
   useGlobalSearchParams: () => ({}),
+  useFocusEffect: jest.fn((callback) => {
+    // Execute the callback immediately in tests
+    if (typeof callback === 'function') {
+      const cleanupFn = callback();
+      // If callback returns a cleanup function, we can call it later if needed
+      return cleanupFn;
+    }
+  }),
   Link: ({ children, href, ...props }) => {
     const React = require('react');
     const { TouchableOpacity, Text } = require('react-native');

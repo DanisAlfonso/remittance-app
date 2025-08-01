@@ -8,6 +8,7 @@ import {
   Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -21,7 +22,7 @@ const { width: screenWidth } = Dimensions.get('window');
 interface AccountCarouselProps {
   accounts: BankAccount[];
   selectedAccount: BankAccount | null;
-  balance: AccountBalance | null;
+  getAccountBalance: (accountId: string) => AccountBalance | null;
   onAccountSelect: (accountId: string) => void;
   onCreateAccount: () => void;
   lastRefreshTime?: Date | null;
@@ -42,6 +43,21 @@ const AccountCard: React.FC<AccountCardProps> = ({
   onPress,
   lastRefreshTime,
 }) => {
+  // Simplified animation for balance display
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Simple fade-in when balance changes
+  useEffect(() => {
+    if (balance) {
+      // Simple fade-in animation
+      fadeAnim.setValue(0.7);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [balance, fadeAnim]);
   const getCurrencySymbol = (currency: string): string => {
     switch (currency) {
       case 'EUR':
@@ -110,12 +126,21 @@ const AccountCard: React.FC<AccountCardProps> = ({
       <View style={styles.balanceSection}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
         {balance ? (
-          <Text style={styles.balanceAmount}>
-            {bankingService.formatAmount(balance.amount, account.currency)}
-          </Text>
+          <Animated.View 
+            style={[
+              styles.balanceAmountContainer,
+              {
+                opacity: fadeAnim,
+              },
+            ]}
+          >
+            <Text style={styles.balanceAmount}>
+              {bankingService.formatAmount(balance.amount, account.currency)}
+            </Text>
+          </Animated.View>
         ) : (
-          <View style={styles.balanceAmount}>
-            <SkeletonLoader width={120} height={20} borderRadius={10} />
+          <View style={styles.balanceAmountContainer}>
+            <SkeletonLoader width={120} height={35} borderRadius={10} />
           </View>
         )}
         
@@ -194,7 +219,7 @@ const AddAccountCard: React.FC<{ onPress: () => void }> = ({ onPress }) => (
 export default function AccountCarousel({
   accounts,
   selectedAccount,
-  balance,
+  getAccountBalance,
   onAccountSelect,
   onCreateAccount,
   lastRefreshTime,
@@ -228,6 +253,8 @@ export default function AccountCarousel({
           onAccountSelect(accountInView.id);
         }
       }
+      // If user swiped to "Add Account" card, don't auto-select anything
+      // This allows them to stay on the Add Account card without snapping back
     }, 150); // Small delay to ensure scroll has settled
   };
 
@@ -242,7 +269,12 @@ export default function AccountCarousel({
   useEffect(() => {
     if (selectedAccount && accounts.length > 0) {
       const selectedIndex = accounts.findIndex(account => account.id === selectedAccount.id);
-      if (selectedIndex !== -1 && selectedIndex !== currentIndex && !isScrolling) {
+      // Only auto-scroll if:
+      // 1. The selected account exists in accounts
+      // 2. The current index doesn't match the selected account
+      // 3. We're not currently scrolling
+      // 4. The current index is not on the "Add Account" card (allow staying on Add Account card)
+      if (selectedIndex !== -1 && selectedIndex !== currentIndex && !isScrolling && currentIndex < accounts.length) {
         setCurrentIndex(selectedIndex);
         scrollToAccount(selectedIndex);
       }
@@ -275,13 +307,15 @@ export default function AccountCarousel({
         onScroll={handleScroll}
         scrollEventThrottle={16}
         decelerationRate="fast"
+        bounces={true} // Allow bouncing for better UX
+        bouncesZoom={false}
       >
         {allItems.map((account) => (
           <View key={account?.id || 'add-account'} style={styles.cardContainer}>
             {account ? (
               <AccountCard
                 account={account}
-                balance={selectedAccount?.id === account.id ? balance : null}
+                balance={getAccountBalance(account.id)}
                 isSelected={selectedAccount?.id === account.id}
                 onPress={() => onAccountSelect(account.id)}
                 lastRefreshTime={lastRefreshTime}
@@ -446,16 +480,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textAlign: 'center',
   },
+  balanceAmountContainer: {
+    minHeight: 35, // Prevent height changes during loading
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   balanceAmount: {
     fontSize: 28,
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: -0.5,
-    marginBottom: 4,
     textAlign: 'center',
-    minHeight: 35, // Prevent height changes during loading
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   lastUpdated: {
     flexDirection: 'row',

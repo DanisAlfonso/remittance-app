@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../../lib/auth';
+// import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
 import { remittanceService, type HNLRecipient } from '../../lib/remittanceService';
 
@@ -32,8 +32,8 @@ interface BalanceRemittanceResult {
 }
 
 export default function EURHNLBalanceRemittanceScreen() {
-  const params = useLocalSearchParams();
-  const { user, token } = useAuthStore();
+  // const params = useLocalSearchParams(); // Commented out as not used
+  // const { user, token } = useAuthStore(); // Commented out as not used
   const { accounts, refreshBalance } = useWalletStore();
   const [step, setStep] = useState<FlowStep>('recipients');
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
@@ -79,8 +79,8 @@ export default function EURHNLBalanceRemittanceScreen() {
           // Handle different balance formats
           if (typeof balance.amount === 'string') {
             balanceValue = parseFloat(balance.amount);
-          } else if (typeof balance.amount === 'object' && 'value' in balance.amount) {
-            balanceValue = balance.amount.value;
+          } else if (typeof balance.amount === 'object' && balance.amount && 'value' in balance.amount) {
+            balanceValue = (balance.amount as { value: number }).value;
           } else if (typeof balance.amount === 'number') {
             balanceValue = balance.amount;
           } else {

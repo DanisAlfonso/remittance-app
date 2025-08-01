@@ -31,6 +31,7 @@ export interface Transfer {
   fee: number;
   reference?: string;
   description?: string;
+  metadata?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;

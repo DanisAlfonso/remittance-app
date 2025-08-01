@@ -143,27 +143,43 @@ export class OBPService {
   async importSandboxData(currency?: string): Promise<{
     message: string;
     data: {
-      banks: Array<{
-        id: string;
-        short_name: string;
-        full_name: string;
-        accounts_imported: number;
-      }>;
-      total_accounts: number;
-      total_transactions: number;
+      deposit: {
+        amount: number;
+        currency: string;
+        reference: string;
+        status: string;
+      };
+      virtual_account: {
+        bank_name: string;
+        bic: string;
+        iban: string;
+      };
+      master_account: {
+        new_balance: string;
+        transaction_id: string;
+      };
+      instructions: string;
     };
   }> {
     const response = await apiClient.obpPost<{
       message: string;
       data: {
-        banks: Array<{
-          id: string;
-          short_name: string;
-          full_name: string;
-          accounts_imported: number;
-        }>;
-        total_accounts: number;
-        total_transactions: number;
+        deposit: {
+          amount: number;
+          currency: string;
+          reference: string;
+          status: string;
+        };
+        virtual_account: {
+          bank_name: string;
+          bic: string;
+          iban: string;
+        };
+        master_account: {
+          new_balance: string;
+          transaction_id: string;
+        };
+        instructions: string;
       };
     }>('/obp/v5.1.0/sandbox/data-import', currency ? { currency } : {});
     return response;

@@ -38,6 +38,7 @@ interface WalletState {
   accounts: BankAccount[];
   selectedAccount: BankAccount | null;
   balance: AccountBalance | null;
+  accountBalances: Record<string, AccountBalance>; // Per-account balance cache
   isLoading: boolean;
   error: string | null;
   isInitialized: boolean;
@@ -51,6 +52,7 @@ interface WalletActions {
   selectAccount: (accountId: string) => void;
   refreshBalance: (accountId?: string) => Promise<void>;
   updateAccountBalance: (accountId: string, newBalance: number) => void;
+  getAccountBalance: (accountId: string) => AccountBalance | null;
   
   // UI state
   clearError: () => void;
@@ -67,6 +69,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       accounts: [],
       selectedAccount: null,
       balance: null,
+      accountBalances: {},
       isLoading: false,
       error: null,
       isInitialized: false,
@@ -154,19 +157,22 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       },
 
       selectAccount: (accountId: string) => {
-        const { accounts } = get();
+        const { accounts, accountBalances } = get();
         const account = accounts.find(acc => acc.id === accountId);
         
         if (account) {
+          // Get cached balance for this account, if available
+          const cachedBalance = accountBalances[accountId] || null;
+          
           set({ 
             selectedAccount: account,
-            balance: null, // Clear previous balance
+            balance: cachedBalance, // Use cached balance or null
           });
         }
       },
 
       refreshBalance: async (accountId?: string) => {
-        const { selectedAccount, userId } = get();
+        const { selectedAccount, userId, accountBalances } = get();
         const targetAccountId = accountId || selectedAccount?.id;
         
         if (!targetAccountId) {
@@ -177,8 +183,16 @@ export const useWalletStore = create<WalletState & WalletActions>()(
 
         console.log(`🔄 Refreshing balance for account: ${targetAccountId} (user: ${userId})`);
         
-        // Clear the current balance first to ensure UI updates
-        set({ balance: null, isLoading: true, error: null });
+        // Clear the current balance AND the cached balance for this account to ensure UI updates
+        const updatedBalances = { ...accountBalances };
+        delete updatedBalances[targetAccountId];
+        
+        set({ 
+          balance: targetAccountId === selectedAccount?.id ? null : get().balance,
+          accountBalances: updatedBalances,
+          isLoading: true, 
+          error: null 
+        });
         
         try {
           console.log(`📡 Making balance API call for account: ${targetAccountId}`);
@@ -191,11 +205,16 @@ export const useWalletStore = create<WalletState & WalletActions>()(
             currency: response.balance.currency
           });
           
-          set({
-            balance: response.balance,
+          // Update both the current balance (if this is the selected account) and the cache
+          set((state) => ({
+            balance: targetAccountId === state.selectedAccount?.id ? response.balance : state.balance,
+            accountBalances: {
+              ...state.accountBalances,
+              [targetAccountId]: response.balance
+            },
             isLoading: false,
             error: null,
-          });
+          }));
         } catch (error) {
           const bankingError = error as BankingError;
           console.error(`❌ Balance refresh failed for account ${targetAccountId}:`, {
@@ -222,7 +241,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
         // Update the account in the accounts list
         const updatedAccounts = accounts.map(account => 
           account.id === accountId 
-            ? { ...account, balance: account.balance ? { ...account.balance, amount: newBalance.toString() } : { amount: newBalance.toString(), currency: account.currency } }
+            ? { ...account, balance: newBalance }
             : account
         );
         
@@ -231,7 +250,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
         if (selectedAccount && selectedAccount.id === accountId) {
           updatedSelectedAccount = {
             ...selectedAccount,
-            balance: selectedAccount.balance ? { ...selectedAccount.balance, amount: newBalance.toString() } : { amount: newBalance.toString(), currency: selectedAccount.currency }
+            balance: newBalance
           };
         }
         
@@ -240,7 +259,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
         if (balance && selectedAccount?.id === accountId) {
           updatedBalance = {
             ...balance,
-            amount: balance.amount ? { ...balance.amount, value: newBalance } : { value: newBalance, currency: balance.currency }
+            amount: newBalance
           };
         }
         
@@ -251,6 +270,18 @@ export const useWalletStore = create<WalletState & WalletActions>()(
         });
         
         console.log(`✅ Account balance updated successfully`);
+      },
+
+      getAccountBalance: (accountId: string) => {
+        const { accountBalances, selectedAccount, balance } = get();
+        
+        // If this is the selected account, return the current balance
+        if (selectedAccount?.id === accountId && balance) {
+          return balance;
+        }
+        
+        // Otherwise, return from cache
+        return accountBalances[accountId] || null;
       },
 
       clearError: () => {
@@ -266,6 +297,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           accounts: [],
           selectedAccount: null,
           balance: null,
+          accountBalances: {},
           isLoading: false,
           error: null,
           isInitialized: false,
@@ -282,6 +314,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
             accounts: [],
             selectedAccount: null,
             balance: null,
+            accountBalances: {},
             isLoading: false,
             error: null,
             isInitialized: false,

@@ -14,6 +14,7 @@ import ProfileCircle from '../../components/ui/ProfileCircle';
 import AccountCarousel from '../../components/ui/AccountCarousel';
 import { ExchangeRateTrendCard } from '../../components/ui/ExchangeRateTrendCard';
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
+import { getTransferType, getTransferDisplayName, getTransferTypeText, formatTransferAmount } from '../../lib/transferUtils';
 
 
 export default function DashboardScreen() {
@@ -27,7 +28,8 @@ export default function DashboardScreen() {
     loadAccounts, 
     selectAccount,
     refreshBalance,
-    setUserId 
+    setUserId,
+    getAccountBalance
   } = useWalletStore();
   
   const [recentTransfers, setRecentTransfers] = useState<Transfer[]>([]);
@@ -186,10 +188,10 @@ export default function DashboardScreen() {
       Alert.alert(
         'Success!', 
         `${result.message}\n\n` +
-        `• Banks imported: ${result.data.banks.length}\n` +
-        `• Total accounts: ${result.data.total_accounts}\n` +
-        `• Total transactions: ${result.data.total_transactions}\n\n` +
-        `Your ${selectedAccount.currency} account is now ready for testing transfers.`,
+        `• Deposit: ${result.data.deposit.currency} ${result.data.deposit.amount}\n` +
+        `• Status: ${result.data.deposit.status}\n` +
+        `• Virtual IBAN: ${result.data.virtual_account.iban}\n\n` +
+        `${result.data.instructions}`,
         [
           {
             text: 'Refresh Accounts',
@@ -214,22 +216,7 @@ export default function DashboardScreen() {
     }
   };
 
-  const getTransferType = (transfer: Transfer): 'send' | 'receive' => {
-    return transfer.sourceAmount < 0 ? 'send' : 'receive';
-  };
-
-  const getRecipientName = (transfer: Transfer): string => {
-    if (transfer.recipient) {
-      const name = transfer.recipient.name || 'Unknown';
-      const iban = transfer.recipient.iban || transfer.recipient.accountNumber;
-      
-      if (iban) {
-        return `${name} (${iban.slice(-4)})`;
-      }
-      return name;
-    }
-    return 'Recipient';
-  };
+  // Using shared utility functions from transferUtils
 
 
 
@@ -254,9 +241,19 @@ export default function DashboardScreen() {
     handleUserChange();
   }, [user, userId, setUserId]);
 
+  // Enhanced account selection handler to prevent balance flickering
+  const handleAccountSelect = async (accountId: string) => {
+    // 1. First, select the account (this clears the old balance)
+    selectAccount(accountId);
+    
+    // 2. Immediately refresh the balance for the specific account
+    // This prevents showing stale balance data from other accounts
+    await refreshBalance(accountId);
+  };
+
   useEffect(() => {
     if (selectedAccount && !balance) {
-      refreshBalance();
+      refreshBalance(selectedAccount.id);
     }
   }, [selectedAccount, balance, refreshBalance]);
 
@@ -380,8 +377,8 @@ export default function DashboardScreen() {
           <AccountCarousel
             accounts={accounts}
             selectedAccount={selectedAccount}
-            balance={balance}
-            onAccountSelect={selectAccount}
+            getAccountBalance={getAccountBalance}
+            onAccountSelect={handleAccountSelect}
             onCreateAccount={() => router.push('/(dashboard)/create-currency-account')}
             lastRefreshTime={lastRefreshTime}
           />
@@ -555,7 +552,7 @@ export default function DashboardScreen() {
             <View style={styles.activityContainer}>
               {recentTransfers.map((transfer) => {
                 const transferType = getTransferType(transfer);
-                const recipientName = getRecipientName(transfer);
+                const displayName = getTransferDisplayName(transfer);
                 const amount = Math.abs(Number(transfer.sourceAmount) || 0);
                 
                 return (
@@ -574,9 +571,9 @@ export default function DashboardScreen() {
                     </View>
                     
                     <View style={styles.activityDetails}>
-                      <Text style={styles.activityRecipientModern}>{recipientName}</Text>
+                      <Text style={styles.activityRecipientModern}>{displayName}</Text>
                       <Text style={styles.activityTypeModern}>
-                        {transferType === 'send' ? 'Money sent' : 'Money received'}
+                        {getTransferTypeText(transfer)}
                       </Text>
                       <Text style={styles.activityDateModern}>
                         {new Date(transfer.createdAt).toLocaleDateString('en-US', {
@@ -592,7 +589,7 @@ export default function DashboardScreen() {
                         styles.activityAmountModern,
                         { color: transferType === 'send' ? '#3B82F6' : '#10B981' }
                       ]}>
-                        {transferType === 'send' ? '-' : '+'}${amount.toFixed(2)}
+                        {transferType === 'send' ? '-' : '+'}{formatTransferAmount(amount, transfer.sourceCurrency)}
                       </Text>
                       <Text style={styles.activityCurrencyModern}>{transfer.sourceCurrency}</Text>
                     </View>

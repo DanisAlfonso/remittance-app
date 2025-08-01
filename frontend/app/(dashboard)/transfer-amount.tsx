@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useWalletStore } from '../../lib/walletStore';
 import { useAuthStore } from '../../lib/auth';
 import { apiClient } from '../../lib/api';
+import { formatTransferAmount, getCurrencySymbol } from '../../lib/transferUtils';
 import Button from '../../components/ui/Button';
 
 interface RecipientData {
@@ -154,6 +155,15 @@ export default function TransferAmountScreen() {
     }
   }, [selectedAccount, currency]);
 
+  // Handle prefilled amount from "Send Again" functionality
+  useEffect(() => {
+    const prefillAmount = params.prefillAmount as string;
+    if (prefillAmount && !amount) {
+      console.log('🔄 Prefilling amount from Send Again:', prefillAmount);
+      setAmount(prefillAmount);
+    }
+  }, [params.prefillAmount]);
+
   // Handle username lookup for QR code scanning
   useEffect(() => {
     const resolveRecipient = async () => {
@@ -269,12 +279,12 @@ export default function TransferAmountScreen() {
     }
     
     if (numAmount < 1) {
-      Alert.alert('Minimum Amount', `Minimum transfer amount is ${getCurrencySymbol(selectedAccount?.currency || 'EUR')}1`);
+      Alert.alert('Minimum Amount', `Minimum transfer amount is ${formatTransferAmount(1, selectedAccount?.currency || 'EUR')}`);
       return false;
     }
     
     if (numAmount > 10000) {
-      Alert.alert('Maximum Amount', `Maximum transfer amount is ${getCurrencySymbol(selectedAccount?.currency || 'EUR')}10,000`);
+      Alert.alert('Maximum Amount', `Maximum transfer amount is ${formatTransferAmount(10000, selectedAccount?.currency || 'EUR')}`);
       return false;
     }
     
@@ -372,7 +382,7 @@ export default function TransferAmountScreen() {
       
       Alert.alert(
         'Transfer Initiated!',
-        `Your transfer of ${getCurrencySymbol(selectedAccount?.currency || 'EUR')}${amount} to ${recipientName} has been initiated successfully.`,
+        `Your transfer of ${formatTransferAmount(parseFloat(amount), selectedAccount?.currency || 'EUR')} to ${recipientName} has been initiated successfully.`,
         [
           {
             text: 'View Details',
@@ -418,15 +428,6 @@ export default function TransferAmountScreen() {
     }
   };
 
-  const getCurrencySymbol = (currencyCode: string): string => {
-    const symbols: Record<string, string> = {
-      'EUR': '€',
-      'HNL': 'L',
-      'USD': '$',
-      'GBP': '£'
-    };
-    return symbols[currencyCode] || currencyCode;
-  };
 
   const formatCurrency = (value: number, currencyCode: string): string => {
     return new Intl.NumberFormat('en-US', {

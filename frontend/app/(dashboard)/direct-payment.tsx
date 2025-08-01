@@ -187,16 +187,25 @@ export default function DirectPaymentScreen() {
     return eur && currentRate ? eur * currentRate : 0;
   };
 
+  const calculatePlatformFee = (amount: number): number => {
+    if (amount <= 100) return 0.99;      // €0.99 for transfers up to €100
+    if (amount <= 500) return 1.99;      // €1.99 for transfers €101-€500
+    if (amount <= 1000) return 2.99;     // €2.99 for transfers €501-€1000
+    return 4.99;                         // €4.99 for transfers over €1000
+  };
+
   const calculateFees = (eurAmount: string) => {
     const eur = parseFloat(eurAmount);
-    if (!eur) return { platformFee: 0.99, exchangeMargin: 0, total: 0.99 };
+    const baseFee = eur ? calculatePlatformFee(eur) : 0.99;
+    if (!eur) return { platformFee: baseFee, exchangeMargin: 0, total: baseFee };
     
-    const platformFee = 0.99;
-    const exchangeMargin = eur * 0.015; // 1.5% margin
+    const platformFee = baseFee;
+    // Note: Exchange margin is built into the rate (like real remittance services)
+    const exchangeMargin = 0; // Margin is built into exchange rate
     return {
       platformFee,
       exchangeMargin,
-      total: platformFee + exchangeMargin
+      total: platformFee // Only show the transparent transfer fee
     };
   };
 
@@ -314,11 +323,6 @@ export default function DirectPaymentScreen() {
                 <Text style={styles.feeAmount}>€{calculateFees(amount).platformFee.toFixed(2)}</Text>
               </View>
               <View style={styles.feeRow}>
-                <Text style={styles.feeLabel}>Exchange margin</Text>
-                <Text style={styles.feeAmount}>€{calculateFees(amount).exchangeMargin.toFixed(2)}</Text>
-              </View>
-              <View style={styles.feeDivider} />
-              <View style={styles.feeRow}>
                 <Text style={styles.totalLabel}>Total cost</Text>
                 <Text style={styles.totalAmount}>
                   €{(parseFloat(amount) + calculateFees(amount).total).toFixed(2)}
@@ -382,11 +386,6 @@ export default function DirectPaymentScreen() {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Platform fee</Text>
               <Text style={styles.summaryValue}>€{calculateFees(amount).platformFee.toFixed(2)}</Text>
-            </View>
-            
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Exchange margin</Text>
-              <Text style={styles.summaryValue}>€{calculateFees(amount).exchangeMargin.toFixed(2)}</Text>
             </View>
             
             <View style={styles.summaryDivider} />

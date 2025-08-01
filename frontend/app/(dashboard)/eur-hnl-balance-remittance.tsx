@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +49,7 @@ export default function EURHNLBalanceRemittanceScreen() {
   const [currentRate, setCurrentRate] = useState<number>(0);
   const [isLoadingRate, setIsLoadingRate] = useState(false);
   const [eurBalance, setEurBalance] = useState<number>(0);
+  const [showFeeInfo, setShowFeeInfo] = useState(false);
 
   useEffect(() => {
     // Only load data if we have accounts
@@ -284,16 +285,24 @@ export default function EURHNLBalanceRemittanceScreen() {
     return eur && currentRate ? eur * currentRate : 0;
   };
 
+  const calculatePlatformFee = (amount: number): number => {
+    if (amount <= 100) return 0.99;      // €0.99 for transfers up to €100
+    if (amount <= 500) return 1.99;      // €1.99 for transfers €101-€500
+    if (amount <= 1000) return 2.99;     // €2.99 for transfers €501-€1000
+    return 4.99;                         // €4.99 for transfers over €1000
+  };
+
   const calculateFees = (eurAmount: string) => {
     const eur = parseFloat(eurAmount);
     if (!eur) return { platformFee: 0, exchangeMargin: 0, total: 0 };
     
-    const platformFee = 0; // No platform fee for balance transfers
-    const exchangeMargin = eur * 0.015; // 1.5% margin on exchange
+    const platformFee = calculatePlatformFee(eur); // Tiered platform fee
+    // Note: Exchange margin is built into the rate (29.63 vs 30.05)
+    // We don't show it as a separate fee like real remittance services
     return {
       platformFee,
-      exchangeMargin,
-      total: exchangeMargin
+      exchangeMargin: 0, // Margin is built into exchange rate
+      total: platformFee  // Only show the transparent transfer fee
     };
   };
 
@@ -448,14 +457,17 @@ export default function EURHNLBalanceRemittanceScreen() {
             <View style={styles.feesCard}>
               <Text style={styles.feesTitle}>Balance Transfer Fees</Text>
               <View style={styles.feeRow}>
-                <Text style={styles.feeLabel}>Platform fee</Text>
+                <View style={styles.feeLeftContent}>
+                  <Text style={styles.feeLabel}>Platform fee</Text>
+                  <TouchableOpacity 
+                    style={styles.feeInfoIcon}
+                    onPress={() => setShowFeeInfo(true)}
+                  >
+                    <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.feeAmount}>€{calculateFees(amount).platformFee.toFixed(2)}</Text>
               </View>
-              <View style={styles.feeRow}>
-                <Text style={styles.feeLabel}>Exchange margin</Text>
-                <Text style={styles.feeAmount}>€{calculateFees(amount).exchangeMargin.toFixed(2)}</Text>
-              </View>
-              <View style={styles.feeDivider} />
               <View style={styles.feeRow}>
                 <Text style={styles.totalLabel}>Total deducted from balance</Text>
                 <Text style={styles.totalAmount}>
@@ -518,13 +530,6 @@ export default function EURHNLBalanceRemittanceScreen() {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Recipient gets</Text>
               <Text style={styles.summaryHighlight}>L.{calculateHNL(amount).toFixed(2)}</Text>
-            </View>
-            
-            <View style={styles.summaryDivider} />
-            
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Exchange margin</Text>
-              <Text style={styles.summaryValue}>€{calculateFees(amount).exchangeMargin.toFixed(2)}</Text>
             </View>
             
             <View style={styles.summaryDivider} />
@@ -660,6 +665,61 @@ export default function EURHNLBalanceRemittanceScreen() {
       >
         {renderStep()}
       </ScrollView>
+
+      {/* Fee Information Bottom Sheet */}
+      <Modal
+        visible={showFeeInfo}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowFeeInfo(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.bottomSheet}>
+            <View style={styles.sheetHeader}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>Platform Fees</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setShowFeeInfo(false)}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.sheetContent}>
+              <Text style={styles.sheetDescription}>
+                Our transparent pricing structure based on transfer amount:
+              </Text>
+              
+              <View style={styles.feeTable}>
+                <View style={styles.feeTableRow}>
+                  <Text style={styles.feeRange}>€1 - €100</Text>
+                  <Text style={styles.feePrice}>€0.99</Text>
+                </View>
+                <View style={styles.feeTableRow}>
+                  <Text style={styles.feeRange}>€101 - €500</Text>
+                  <Text style={styles.feePrice}>€1.99</Text>
+                </View>
+                <View style={styles.feeTableRow}>
+                  <Text style={styles.feeRange}>€501 - €1,000</Text>
+                  <Text style={styles.feePrice}>€2.99</Text>
+                </View>
+                <View style={styles.feeTableRow}>
+                  <Text style={styles.feeRange}>Over €1,000</Text>
+                  <Text style={styles.feePrice}>€4.99</Text>
+                </View>
+              </View>
+              
+              <View style={styles.sheetNote}>
+                <Ionicons name="shield-checkmark" size={16} color="#10B981" />
+                <Text style={styles.noteText}>
+                  No hidden fees • Real-time exchange rates • Secure transfers
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -948,6 +1008,13 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '500',
   },
+  feeInfo: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 4,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   feeDivider: {
     height: 1,
     backgroundColor: '#F1F5F9',
@@ -1192,5 +1259,106 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontSize: 16,
     fontWeight: '600',
+  },
+
+  // Fee Info UI Styles
+  feeLeftContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  feeInfoIcon: {
+    marginLeft: 6,
+    padding: 2,
+  },
+
+  // Bottom Sheet Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 34, // Safe area padding
+    maxHeight: '70%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    position: 'absolute',
+    top: 8,
+    left: '50%',
+    marginLeft: -18,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'center',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  sheetContent: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
+  sheetDescription: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  feeTable: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  feeTableRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  feeRange: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  feePrice: {
+    fontSize: 16,
+    color: '#1E3A8A',
+    fontWeight: '700',
+  },
+  sheetNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  noteText: {
+    fontSize: 14,
+    color: '#166534',
+    marginLeft: 8,
+    flex: 1,
   },
 });

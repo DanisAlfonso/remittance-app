@@ -48,6 +48,16 @@ interface RemittanceResult {
 export class RemittanceService {
   private exchangeService = new ExchangeRateService();
   
+  /**
+   * Calculate tiered platform fee based on transfer amount
+   */
+  private calculatePlatformFee(amount: number): number {
+    if (amount <= 100) return 0.99;      // €0.99 for transfers up to €100
+    if (amount <= 500) return 1.99;      // €1.99 for transfers €101-€500
+    if (amount <= 1000) return 2.99;     // €2.99 for transfers €501-€1000
+    return 4.99;                         // €4.99 for transfers over €1000
+  }
+  
   // Master account configurations
   private readonly EURBANK_MASTER = {
     bankId: 'EURBANK',
@@ -101,7 +111,7 @@ export class RemittanceService {
       const margin = 0.015; // 1.5% company margin
       const customerRate = interBankRate * (1 - margin);
       const hnlAmount = request.amountEUR * customerRate;
-      const platformFee = 0.99; // €0.99 fixed fee
+      const platformFee = this.calculatePlatformFee(request.amountEUR); // Tiered fee based on amount
       const totalEURDeducted = request.amountEUR + platformFee;
       const exchangeMargin = request.amountEUR * (interBankRate - customerRate);
 

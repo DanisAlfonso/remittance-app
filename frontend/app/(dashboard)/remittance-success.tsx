@@ -100,7 +100,7 @@ export default function RemittanceSuccessScreen() {
           <Text style={styles.infoText}>
             • The recipient will receive the lempiras in their Honduras bank account{'\n'}
             • Processing typically takes 1-2 business days{'\n'}
-            • You'll receive an email confirmation shortly{'\n'}
+            • You&apos;ll receive an email confirmation shortly{'\n'}
             • Keep this transaction ID for your records
           </Text>
         </View>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,8 @@ interface Recipient {
   currency: string;
   country: string;
   lastUsed: string;
+  isFavorite?: boolean;
+  isInternational?: boolean;
 }
 
 export default function SendMoneyScreen() {
@@ -29,6 +32,29 @@ export default function SendMoneyScreen() {
   );
   const [recentRecipients, setRecentRecipients] = useState<Recipient[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
+  const [activeTab, setActiveTab] = useState<'favorites' | 'recent' | 'international'>('recent');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
+  const [favoriteRecipients, setFavoriteRecipients] = useState<Set<string>>(new Set());
+
+  // Load favorites from SecureStore on component mount
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const storedFavorites = await SecureStore.getItemAsync(`favorites_${user?.id}`);
+        if (storedFavorites) {
+          const favoritesArray = JSON.parse(storedFavorites);
+          setFavoriteRecipients(new Set(favoritesArray));
+        }
+      } catch (error) {
+        console.error('Error loading favorites:', error);
+      }
+    };
+
+    if (user?.id) {
+      loadFavorites();
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (!selectedAccount) {
@@ -89,14 +115,17 @@ export default function SendMoneyScreen() {
           
           // Keep the most recent transfer for each recipient
           if (!existing || new Date(transfer.createdAt) > new Date(existing.lastUsed)) {
+            const recipientCountry = getCountryFromCurrency(transfer.targetCurrency);
             recipientMap.set(recipientKey, {
               id: recipientKey,
               name: transfer.recipient.name,
               email: transfer.recipient.email,
               iban: transfer.recipient.iban,
               currency: transfer.targetCurrency,
-              country: getCountryFromCurrency(transfer.targetCurrency),
-              lastUsed: formatRelativeTime(transfer.createdAt)
+              country: recipientCountry,
+              lastUsed: formatRelativeTime(transfer.createdAt),
+              isFavorite: favoriteRecipients.has(recipientKey),
+              isInternational: recipientCountry !== 'EU' && recipientCountry !== getCountryFromCurrency(selectedAccount?.currency || 'EUR')
             });
           }
         }
@@ -194,6 +223,82 @@ export default function SendMoneyScreen() {
     }
   };
 
+  // Filter recipients based on active tab and search query
+  const getFilteredRecipients = () => {
+    let filtered = recentRecipients;
+
+    // Filter by tab
+    switch (activeTab) {
+      case 'favorites':
+        filtered = filtered.filter(r => r.isFavorite);
+        break;
+      case 'international':
+        filtered = filtered.filter(r => r.isInternational);
+        break;
+      case 'recent':
+      default:
+        // Show all recent recipients (already sorted by recency)
+        break;
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(r => 
+        r.name.toLowerCase().includes(query) ||
+        r.email?.toLowerCase().includes(query) ||
+        r.currency.toLowerCase().includes(query) ||
+        r.country.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  };
+
+  const handleTabPress = (tab: 'favorites' | 'recent' | 'international') => {
+    setActiveTab(tab);
+  };
+
+  const handleSearchPress = () => {
+    setIsSearchModalVisible(true);
+  };
+
+  const handleSearchClose = () => {
+    setIsSearchModalVisible(false);
+    setSearchQuery('');
+  };
+
+  const toggleFavorite = async (recipientId: string) => {
+    const newFavorites = new Set(favoriteRecipients);
+    
+    if (newFavorites.has(recipientId)) {
+      newFavorites.delete(recipientId);
+    } else {
+      newFavorites.add(recipientId);
+    }
+    
+    setFavoriteRecipients(newFavorites);
+    
+    // Update the recipients list immediately to reflect the change
+    setRecentRecipients(prevRecipients => 
+      prevRecipients.map(recipient => 
+        recipient.id === recipientId 
+          ? { ...recipient, isFavorite: newFavorites.has(recipientId) }
+          : recipient
+      )
+    );
+    
+    // Save to SecureStore
+    try {
+      const favoritesArray = Array.from(newFavorites);
+      await SecureStore.setItemAsync(`favorites_${user?.id}`, JSON.stringify(favoritesArray));
+      console.log('Favorites saved:', favoritesArray);
+    } catch (error) {
+      console.error('Error saving favorites:', error);
+      // Could show a toast notification here in a real app
+    }
+  };
+
   const renderRecipientsStep = () => (
     <View style={styles.stepContainer}>
       {/* Premium Header */}
@@ -213,7 +318,7 @@ export default function SendMoneyScreen() {
             }
           </Text>
         </View>
-        <TouchableOpacity style={styles.headerActionButton}>
+        <TouchableOpacity style={styles.headerActionButton} onPress={handleSearchPress}>
           <Ionicons name="search" size={20} color="#6B7280" />
         </TouchableOpacity>
       </View>
@@ -280,38 +385,88 @@ export default function SendMoneyScreen() {
         ) : recentRecipients.length > 0 ? (
           <View style={styles.recipientsSection}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Recipients</Text>
+              <Text style={styles.sectionTitle}>
+                {activeTab === 'favorites' ? 'Favorite Recipients' :
+                 activeTab === 'international' ? 'International Recipients' :
+                 'Recent Recipients'}
+              </Text>
               <View style={styles.sectionBadge}>
-                <Text style={styles.sectionBadgeText}>{recentRecipients.length}</Text>
+                <Text style={styles.sectionBadgeText}>{getFilteredRecipients().length}</Text>
               </View>
             </View>
             
             {/* Quick Actions Row */}
             <View style={styles.quickActionsRow}>
               <View style={styles.quickActionsContainer}>
-                <TouchableOpacity style={styles.quickAction}>
-                  <Ionicons name="star" size={16} color="#F59E0B" />
-                  <Text style={styles.quickActionText}>Favorites</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.quickAction,
+                    activeTab === 'favorites' && styles.quickActionActive
+                  ]}
+                  onPress={() => handleTabPress('favorites')}
+                >
+                  <Ionicons 
+                    name="star" 
+                    size={16} 
+                    color={activeTab === 'favorites' ? "#FFFFFF" : "#F59E0B"} 
+                  />
+                  <Text style={[
+                    styles.quickActionText,
+                    activeTab === 'favorites' && styles.quickActionTextActive
+                  ]}>
+                    Favorites
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAction}>
-                  <Ionicons name="time" size={16} color="#8B5CF6" />
-                  <Text style={styles.quickActionText}>Recent</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.quickAction,
+                    activeTab === 'recent' && styles.quickActionActive
+                  ]}
+                  onPress={() => handleTabPress('recent')}
+                >
+                  <Ionicons 
+                    name="time" 
+                    size={16} 
+                    color={activeTab === 'recent' ? "#FFFFFF" : "#8B5CF6"} 
+                  />
+                  <Text style={[
+                    styles.quickActionText,
+                    activeTab === 'recent' && styles.quickActionTextActive
+                  ]}>
+                    Recent
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAction}>
-                  <Ionicons name="globe" size={16} color="#10B981" />
-                  <Text style={styles.quickActionText}>International</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.quickAction,
+                    activeTab === 'international' && styles.quickActionActive
+                  ]}
+                  onPress={() => handleTabPress('international')}
+                >
+                  <Ionicons 
+                    name="globe" 
+                    size={16} 
+                    color={activeTab === 'international' ? "#FFFFFF" : "#10B981"} 
+                  />
+                  <Text style={[
+                    styles.quickActionText,
+                    activeTab === 'international' && styles.quickActionTextActive
+                  ]}>
+                    International
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Enhanced Recipient Cards */}
-            <View style={styles.recipientsList}>
-              {recentRecipients.map((recipient, index) => (
+            {getFilteredRecipients().length > 0 ? (
+              <View style={styles.recipientsList}>
+                {getFilteredRecipients().map((recipient, index) => (
                 <TouchableOpacity 
                   key={recipient.id} 
                   style={[
                     styles.premiumRecipientCard,
-                    { marginBottom: index === recentRecipients.length - 1 ? 0 : 12 }
+                    { marginBottom: index === getFilteredRecipients().length - 1 ? 0 : 12 }
                   ]}
                   onPress={() => {
                     const recipientData = {
@@ -359,18 +514,55 @@ export default function SendMoneyScreen() {
                       </View>
                     </View>
                     <View style={styles.recipientRight}>
-                      <TouchableOpacity style={styles.sendAgainButton}>
-                        <Ionicons name="repeat" size={16} color="#3B82F6" />
-                        <Text style={styles.sendAgainText}>Send Again</Text>
-                      </TouchableOpacity>
+                      <View style={styles.recipientActions}>
+                        <TouchableOpacity 
+                          style={styles.favoriteButton}
+                          onPress={(e) => {
+                            e.stopPropagation(); // Prevent triggering the main card press
+                            toggleFavorite(recipient.id);
+                          }}
+                        >
+                          <Ionicons 
+                            name={recipient.isFavorite ? "star" : "star-outline"} 
+                            size={20} 
+                            color={recipient.isFavorite ? "#F59E0B" : "#9CA3AF"} 
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.sendAgainButton}>
+                          <Ionicons name="repeat" size={16} color="#3B82F6" />
+                          <Text style={styles.sendAgainText}>Send Again</Text>
+                        </TouchableOpacity>
+                      </View>
                       <View style={styles.chevronContainer}>
                         <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
                       </View>
                     </View>
                   </View>
                 </TouchableOpacity>
-              ))}
-            </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.filteredEmptyState}>
+                <View style={styles.emptyStateIcon}>
+                  <Ionicons 
+                    name={activeTab === 'favorites' ? 'star-outline' : 
+                          activeTab === 'international' ? 'globe-outline' : 'time-outline'} 
+                    size={32} 
+                    color="#9CA3AF" 
+                  />
+                </View>
+                <Text style={styles.emptyStateTitle}>
+                  {activeTab === 'favorites' ? 'No favorites yet' :
+                   activeTab === 'international' ? 'No international recipients' :
+                   'No recent recipients'}
+                </Text>
+                <Text style={styles.emptyStateText}>
+                  {activeTab === 'favorites' ? 'Add recipients to favorites for quick access' :
+                   activeTab === 'international' ? 'International transfers will appear here' :
+                   'Start sending money to see recipients here'}
+                </Text>
+              </View>
+            )}
           </View>
         ) : (
           <View style={styles.recipientsSection}>
@@ -422,21 +614,21 @@ export default function SendMoneyScreen() {
   const renderCurrencyStep = () => (
     <View style={styles.stepContainer}>
       {/* Modern Header */}
-      <View style={styles.modernHeader}>
+      <View style={styles.premiumHeader}>
         <TouchableOpacity 
-          style={styles.backButton}
+          style={styles.premiumBackButton}
           onPress={() => setStep('recipients')}
         >
           <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Choose Currency</Text>
-          <Text style={styles.headerSubtitle}>Select currency to send</Text>
+          <Text style={styles.premiumHeaderTitle}>Choose Currency</Text>
+          <Text style={styles.premiumHeaderSubtitle}>Select currency to send</Text>
         </View>
-        <View style={styles.headerAction} />
+        <View style={styles.headerActionButton} />
       </View>
 
-      <View style={styles.modernContent}>
+      <View style={styles.premiumContent}>
         {/* Euros Option */}
         <TouchableOpacity 
           style={styles.modernCurrencyCard} 
@@ -498,7 +690,7 @@ export default function SendMoneyScreen() {
           </Text>
           <Text style={styles.premiumHeaderSubtitle}>Choose transfer method</Text>
         </View>
-        <View style={styles.headerAction} />
+        <View style={styles.headerActionButton} />
       </View>
 
       <View style={styles.premiumContent}>
@@ -672,6 +864,122 @@ export default function SendMoneyScreen() {
       >
         {renderStep()}
       </ScrollView>
+
+      {/* Search Modal */}
+      <Modal
+        visible={isSearchModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleSearchClose}
+      >
+        <SafeAreaView style={styles.searchModalContainer}>
+          <View style={styles.searchHeader}>
+            <TouchableOpacity 
+              style={styles.searchCloseButton}
+              onPress={handleSearchClose}
+            >
+              <Ionicons name="close" size={24} color="#374151" />
+            </TouchableOpacity>
+            <Text style={styles.searchTitle}>Search Recipients</Text>
+            <View style={styles.searchHeaderSpacer} />
+          </View>
+
+          <View style={styles.searchInputContainer}>
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={20} color="#9CA3AF" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by name, email, or currency..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus={true}
+                placeholderTextColor="#9CA3AF"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          <ScrollView style={styles.searchResults}>
+            {getFilteredRecipients().length > 0 ? (
+              <View style={styles.searchResultsList}>
+                {getFilteredRecipients().map((recipient) => (
+                  <TouchableOpacity
+                    key={recipient.id}
+                    style={styles.searchResultItem}
+                    onPress={() => {
+                      handleSearchClose();
+                      const recipientData = {
+                        type: 'iban',
+                        holderName: recipient.name,
+                        iban: recipient.iban,
+                        currency: recipient.currency,
+                        country: recipient.country,
+                        bankName: 'Bank Transfer',
+                      };
+                      
+                      router.push({
+                        pathname: '/(dashboard)/transfer-amount',
+                        params: {
+                          currency: recipient.currency,
+                          recipientData: JSON.stringify(recipientData)
+                        }
+                      });
+                    }}
+                  >
+                    <View style={styles.searchResultAvatar}>
+                      <Text style={styles.searchResultInitials}>
+                        {recipient.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.searchResultInfo}>
+                      <Text style={styles.searchResultName}>{recipient.name}</Text>
+                      <Text style={styles.searchResultDetails}>
+                        {recipient.currency} • {recipient.lastUsed}
+                      </Text>
+                    </View>
+                    <View style={styles.searchResultActions}>
+                      <TouchableOpacity 
+                        style={styles.searchFavoriteButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(recipient.id);
+                        }}
+                      >
+                        <Ionicons 
+                          name={recipient.isFavorite ? "star" : "star-outline"} 
+                          size={18} 
+                          color={recipient.isFavorite ? "#F59E0B" : "#9CA3AF"} 
+                        />
+                      </TouchableOpacity>
+                      <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : searchQuery.trim() ? (
+              <View style={styles.searchEmptyState}>
+                <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.searchEmptyTitle}>No results found</Text>
+                <Text style={styles.searchEmptyText}>
+                  Try searching with a different name or currency
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.searchEmptyState}>
+                <Ionicons name="people-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.searchEmptyTitle}>Start typing to search</Text>
+                <Text style={styles.searchEmptyText}>
+                  Search through your recent recipients
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -767,7 +1075,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     backgroundColor: '#3B82F6',
-    background: 'linear-gradient(135deg, #3B82F6 0%, #1E40AF 100%)',
   },
   heroIconContainer: {
     marginRight: 20,
@@ -851,17 +1158,19 @@ const styles = StyleSheet.create({
   },
   quickActionsContainer: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 0, // No extra padding since parent container already has 20px
+    paddingHorizontal: 4, // Small padding to prevent edge touch
+    gap: 8, // Even spacing between buttons
   },
   quickAction: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 20,
-    gap: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: '#F1F5F9',
     shadowColor: '#1E3A8A',
@@ -874,6 +1183,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#374151',
+  },
+  quickActionActive: {
+    backgroundColor: '#3B82F6',
+    shadowColor: '#3B82F6',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  quickActionTextActive: {
+    color: '#FFFFFF',
   },
 
   // 💎 Premium Recipient Cards
@@ -974,6 +1293,21 @@ const styles = StyleSheet.create({
   recipientRight: {
     alignItems: 'flex-end',
     gap: 8,
+  },
+  recipientActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  favoriteButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   sendAgainButton: {
     flexDirection: 'row',
@@ -1093,6 +1427,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  filteredEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
   },
 
   // 🏆 Trust Section
@@ -1456,7 +1795,143 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  flagEmoji: {
+
+  // 🔍 Search Modal Styles
+  searchModalContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  searchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  searchCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E3A8A',
+  },
+  searchHeaderSpacer: {
+    width: 40,
+  },
+  searchInputContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  searchResults: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  searchResultsList: {
+    paddingVertical: 16,
+    gap: 12,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    gap: 16,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F8FAFC',
+  },
+  searchResultAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchResultInitials: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#3B82F6',
+  },
+  searchResultInfo: {
+    flex: 1,
+  },
+  searchResultActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  searchFavoriteButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchResultName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginBottom: 4,
+  },
+  searchResultDetails: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  searchEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+  },
+  searchEmptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  searchEmptyText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -11,7 +11,6 @@
  */
 
 import { prisma } from '../config/database';
-import { Prisma } from '@prisma/client';
 import { obpApiService } from './obp-api';
 import { ExchangeRateService } from './exchange-rates';
 
@@ -60,9 +59,9 @@ export class ProductionRemittanceService {
    * Calculate tiered platform fee based on transfer amount
    */
   private calculatePlatformFee(amount: number): number {
-    if (amount <= 100) return 0.99;      // €0.99 for transfers up to €100
-    if (amount <= 500) return 1.99;      // €1.99 for transfers €101-€500
-    if (amount <= 1000) return 2.99;     // €2.99 for transfers €501-€1000
+    if (amount <= 100) {return 0.99;}      // €0.99 for transfers up to €100
+    if (amount <= 500) {return 1.99;}      // €1.99 for transfers €101-€500
+    if (amount <= 1000) {return 2.99;}     // €2.99 for transfers €501-€1000
     return 4.99;                         // €4.99 for transfers over €1000
   }
   
@@ -215,12 +214,13 @@ export class ProductionRemittanceService {
           throw new Error('User EUR account not found');
         }
 
-        const currentUserBalance = userEurAccount.lastBalance || new Prisma.Decimal(0);
-        if (currentUserBalance.lt(totalEURDeducted)) {
-          throw new Error(`Insufficient EUR balance. Available: €${currentUserBalance}, Required: €${totalEURDeducted}`);
+        const currentUserBalance = userEurAccount.lastBalance || 0;
+        const currentBalanceFloat = parseFloat(currentUserBalance.toString());
+        if (currentBalanceFloat < totalEURDeducted) {
+          throw new Error(`Insufficient EUR balance. Available: €${currentBalanceFloat}, Required: €${totalEURDeducted}`);
         }
 
-        const newUserBalance = currentUserBalance.sub(totalEURDeducted);
+        const newUserBalance = currentBalanceFloat - totalEURDeducted;
         await tx.bankAccount.update({
           where: { id: userEurAccount.id },
           data: {

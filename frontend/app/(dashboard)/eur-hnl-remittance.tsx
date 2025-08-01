@@ -58,7 +58,7 @@ export default function EURHNLRemittanceScreen() {
   }, [amount]);
 
   const loadRecipients = async () => {
-    if (!token) return;
+    if (!token) {return;}
     
     setIsLoadingRecipients(true);
     try {
@@ -94,7 +94,7 @@ export default function EURHNLRemittanceScreen() {
   };
 
   const loadExchangeRate = async () => {
-    if (!token || !amount || parseFloat(amount) <= 0) return;
+    if (!token || !amount || parseFloat(amount) <= 0) {return;}
     
     setIsLoadingRate(true);
     try {
@@ -233,10 +233,6 @@ export default function EURHNLRemittanceScreen() {
     }
   };
 
-  const formatCurrency = (value: number, currencyCode: string): string => {
-    const symbols: Record<string, string> = { 'EUR': '€', 'HNL': 'L.' };
-    return `${symbols[currencyCode] || currencyCode}${value.toFixed(2)}`;
-  };
 
   const renderRecipientsStep = () => (
     <View style={styles.stepContainer}>

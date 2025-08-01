@@ -5,7 +5,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/auth';
 import { useWalletStore } from '../../lib/walletStore';
-import { apiClient } from '../../lib/api';
 import { remittanceService, type HNLRecipient } from '../../lib/remittanceService';
 
 type FlowStep = 'recipients' | 'amount' | 'confirm' | 'processing' | 'success';
@@ -34,9 +33,6 @@ interface BalanceRemittanceResult {
 
 export default function EURHNLBalanceRemittanceScreen() {
   const params = useLocalSearchParams();
-  const sourceCurrency = params.sourceCurrency?.toString() || 'EUR';
-  const targetCurrency = params.targetCurrency?.toString() || 'HNL';
-  const paymentType = params.paymentType?.toString() || 'balance';
   const { user, token } = useAuthStore();
   const { accounts, refreshBalance } = useWalletStore();
   const [step, setStep] = useState<FlowStep>('recipients');
@@ -44,7 +40,7 @@ export default function EURHNLBalanceRemittanceScreen() {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
   const [amount, setAmount] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [, setIsProcessing] = useState(false);
   const [remittanceResult, setRemittanceResult] = useState<BalanceRemittanceResult | null>(null);
   const [currentRate, setCurrentRate] = useState<number>(0);
   const [isLoadingRate, setIsLoadingRate] = useState(false);
@@ -146,7 +142,7 @@ export default function EURHNLBalanceRemittanceScreen() {
   };
 
   const loadExchangeRate = async () => {
-    if (!amount || parseFloat(amount) <= 0) return;
+    if (!amount || parseFloat(amount) <= 0) {return;}
     
     setIsLoadingRate(true);
     try {
@@ -286,15 +282,15 @@ export default function EURHNLBalanceRemittanceScreen() {
   };
 
   const calculatePlatformFee = (amount: number): number => {
-    if (amount <= 100) return 0.99;      // €0.99 for transfers up to €100
-    if (amount <= 500) return 1.99;      // €1.99 for transfers €101-€500
-    if (amount <= 1000) return 2.99;     // €2.99 for transfers €501-€1000
+    if (amount <= 100) {return 0.99;}      // €0.99 for transfers up to €100
+    if (amount <= 500) {return 1.99;}      // €1.99 for transfers €101-€500
+    if (amount <= 1000) {return 2.99;}     // €2.99 for transfers €501-€1000
     return 4.99;                         // €4.99 for transfers over €1000
   };
 
   const calculateFees = (eurAmount: string) => {
     const eur = parseFloat(eurAmount);
-    if (!eur) return { platformFee: 0, exchangeMargin: 0, total: 0 };
+    if (!eur) {return { platformFee: 0, exchangeMargin: 0, total: 0 };}
     
     const platformFee = calculatePlatformFee(eur); // Tiered platform fee
     // Note: Exchange margin is built into the rate (29.63 vs 30.05)

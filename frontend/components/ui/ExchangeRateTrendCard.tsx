@@ -10,6 +10,7 @@ import {
 import { LineChart } from 'react-native-gifted-charts';
 import { Ionicons } from '@expo/vector-icons';
 import { exchangeRateHistoryService } from '../../lib/exchangeRateHistory';
+import { SkeletonLoader } from './SkeletonLoader';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -159,9 +160,15 @@ export const ExchangeRateTrendCard: React.FC = () => {
         <View style={styles.statsContainer}>
           <View style={styles.currentRate}>
             <View style={styles.liveRateContainer}>
-              <Text style={styles.rateValue}>
-                {loadingCurrentRate ? '---' : currentRate ? currentRate.toFixed(2) : '---'}
-              </Text>
+              {loadingCurrentRate || !currentRate ? (
+                <View style={styles.rateValue}>
+                  <SkeletonLoader width={80} height={20} borderRadius={10} />
+                </View>
+              ) : (
+                <Text style={styles.rateValue}>
+                  {currentRate.toFixed(2)}
+                </Text>
+              )}
               <View style={styles.liveIndicator}>
                 <View style={styles.liveDot} />
                 <Text style={styles.liveText}>LIVE</Text>
@@ -509,6 +516,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     color: '#1F2937',
+    minHeight: 35, // Prevent height changes during loading
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   rateLabel: {
     fontSize: 14,

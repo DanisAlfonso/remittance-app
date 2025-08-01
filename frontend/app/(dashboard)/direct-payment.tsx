@@ -38,14 +38,13 @@ interface DirectPaymentResult {
 }
 
 export default function DirectPaymentScreen() {
-  const { currency, paymentType } = useLocalSearchParams<{ currency?: string; paymentType?: string }>();
   const { user, token } = useAuthStore();
   const [step, setStep] = useState<FlowStep>('recipients');
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
   const [amount, setAmount] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [, setIsProcessing] = useState(false);
   const [paymentResult, setPaymentResult] = useState<DirectPaymentResult | null>(null);
   const [currentRate, setCurrentRate] = useState<number>(0);
   const [isLoadingRate, setIsLoadingRate] = useState(false);
@@ -68,8 +67,8 @@ export default function DirectPaymentScreen() {
       
       if (response.success && response.data?.beneficiaries) {
         const hnlRecipients = response.data.beneficiaries
-          .filter((b: any) => b.currency === 'HNL')
-          .map((b: any) => ({
+          .filter((b: { currency: string }) => b.currency === 'HNL')
+          .map((b: { accountNumber: string; firstName: string; lastName: string; bankName: string }) => ({
             id: b.accountNumber,
             name: `${b.firstName} ${b.lastName}`,
             accountNumber: b.accountNumber,
@@ -188,16 +187,16 @@ export default function DirectPaymentScreen() {
   };
 
   const calculatePlatformFee = (amount: number): number => {
-    if (amount <= 100) return 0.99;      // €0.99 for transfers up to €100
-    if (amount <= 500) return 1.99;      // €1.99 for transfers €101-€500
-    if (amount <= 1000) return 2.99;     // €2.99 for transfers €501-€1000
+    if (amount <= 100) {return 0.99;}      // €0.99 for transfers up to €100
+    if (amount <= 500) {return 1.99;}      // €1.99 for transfers €101-€500
+    if (amount <= 1000) {return 2.99;}     // €2.99 for transfers €501-€1000
     return 4.99;                         // €4.99 for transfers over €1000
   };
 
   const calculateFees = (eurAmount: string) => {
     const eur = parseFloat(eurAmount);
     const baseFee = eur ? calculatePlatformFee(eur) : 0.99;
-    if (!eur) return { platformFee: baseFee, exchangeMargin: 0, total: baseFee };
+    if (!eur) {return { platformFee: baseFee, exchangeMargin: 0, total: baseFee };}
     
     const platformFee = baseFee;
     // Note: Exchange margin is built into the rate (like real remittance services)

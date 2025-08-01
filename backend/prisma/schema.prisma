@@ -94,9 +94,11 @@ model Transaction {
   providerFee        Decimal? @db.Decimal(10, 2)
   totalFee           Decimal? @db.Decimal(10, 2)
   
-  // Reference numbers
+  // Reference numbers and metadata
   referenceNumber    String?  @unique
   providerReference  String?
+  description        String?
+  metadata           String?  @db.Text
   
   // Timestamps
   createdAt DateTime @default(now())

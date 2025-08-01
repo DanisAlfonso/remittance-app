@@ -52,9 +52,9 @@ export class RemittanceService {
    * Calculate tiered platform fee based on transfer amount
    */
   private calculatePlatformFee(amount: number): number {
-    if (amount <= 100) return 0.99;      // €0.99 for transfers up to €100
-    if (amount <= 500) return 1.99;      // €1.99 for transfers €101-€500
-    if (amount <= 1000) return 2.99;     // €2.99 for transfers €501-€1000
+    if (amount <= 100) {return 0.99;}      // €0.99 for transfers up to €100
+    if (amount <= 500) {return 1.99;}      // €1.99 for transfers €101-€500
+    if (amount <= 1000) {return 2.99;}     // €2.99 for transfers €501-€1000
     return 4.99;                         // €4.99 for transfers over €1000
   }
   

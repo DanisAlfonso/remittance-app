@@ -13,6 +13,7 @@ import { obpService } from '../../lib/obpService';
 import ProfileCircle from '../../components/ui/ProfileCircle';
 import AccountCarousel from '../../components/ui/AccountCarousel';
 import { ExchangeRateTrendCard } from '../../components/ui/ExchangeRateTrendCard';
+import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 
 
 export default function DashboardScreen() {
@@ -32,6 +33,7 @@ export default function DashboardScreen() {
   const [recentTransfers, setRecentTransfers] = useState<Transfer[]>([]);
   const [isLoadingTransfers, setIsLoadingTransfers] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [lastAutoRefreshTime, setLastAutoRefreshTime] = useState<Date | null>(null);
   const [isImportingSandbox, setIsImportingSandbox] = useState(false);
@@ -46,7 +48,10 @@ export default function DashboardScreen() {
       return;
     }
     
-    setIsLoadingTransfers(true);
+    // Only show loading indicator on first load, not on refresh
+    if (!hasInitiallyLoaded) {
+      setIsLoadingTransfers(true);
+    }
     try {
       console.log('🔍 Loading recent transfers with auth token...', {
         hasToken: !!token,
@@ -59,6 +64,7 @@ export default function DashboardScreen() {
       
       const response = await transferService.getTransferHistory(3, 0); // Load last 3 OBP transaction requests
       setRecentTransfers(response.transfers);
+      setHasInitiallyLoaded(true);
       console.log('✅ Recent transfers loaded:', response.transfers.length, 'transfers');
     } catch (error) {
       console.error('❌ Failed to load recent transfers:', error);
@@ -72,7 +78,9 @@ export default function DashboardScreen() {
         setRecentTransfers([]);
       }
     } finally {
-      setIsLoadingTransfers(false);
+      if (!hasInitiallyLoaded) {
+        setIsLoadingTransfers(false);
+      }
     }
   };
 
@@ -400,7 +408,7 @@ export default function DashboardScreen() {
         )}
 
         {/* Quick Actions - Updated positioning */}
-        {selectedAccount && balance && (
+        {selectedAccount ? (
           <View style={styles.quickActionsSection}>
             <Text style={styles.quickActionsSectionTitle}>
               {selectedAccount?.currency} Wallet
@@ -488,7 +496,28 @@ export default function DashboardScreen() {
               </Pressable>
             </View>
           </View>
-        )}
+        ) : accounts.length > 0 ? (
+          <View style={styles.quickActionsSection}>
+            <SkeletonLoader width="40%" height={20} borderRadius={10} />
+            <View style={styles.quickActionsGrid}>
+              {[1, 2, 3].map((_, index) => (
+                <View key={index} style={[styles.actionButton, styles.skeletonActionButton]}>
+                  <SkeletonLoader width={32} height={32} borderRadius={16} />
+                  <SkeletonLoader width="60%" height={12} borderRadius={6} />
+                  <SkeletonLoader width="40%" height={10} borderRadius={5} />
+                </View>
+              ))}
+            </View>
+            <View style={styles.secondaryActionsGrid}>
+              {[1, 2].map((_, index) => (
+                <View key={index} style={[styles.actionButton, styles.skeletonActionButton]}>
+                  <SkeletonLoader width={32} height={32} borderRadius={16} />
+                  <SkeletonLoader width="50%" height={12} borderRadius={6} />
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         {/* Exchange Rate Trend Card */}
         <ExchangeRateTrendCard />
@@ -508,11 +537,19 @@ export default function DashboardScreen() {
           </View>
           
           {isLoadingTransfers ? (
-            <View style={styles.loadingContainer}>
-              <View style={styles.loadingIndicator}>
-                <Ionicons name="sync" size={24} color="#3B82F6" />
-              </View>
-              <Text style={styles.loadingText}>Loading your recent activity...</Text>
+            <View style={styles.activityContainer}>
+              {/* Skeleton loading for 3 items */}
+              {[1, 2, 3].map((_, index) => (
+                <View key={index} style={styles.activitySkeleton}>
+                  <SkeletonLoader width={48} height={48} borderRadius={24} />
+                  <View style={styles.skeletonContent}>
+                    <SkeletonLoader width="70%" height={16} borderRadius={8} />
+                    <SkeletonLoader width="50%" height={14} borderRadius={7} />
+                    <SkeletonLoader width="30%" height={12} borderRadius={6} />
+                  </View>
+                  <SkeletonLoader width={60} height={16} borderRadius={8} />
+                </View>
+              ))}
             </View>
           ) : recentTransfers.length > 0 ? (
             <View style={styles.activityContainer}>
@@ -791,6 +828,14 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     color: '#3B82F6',
   },
+  skeletonActionButton: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
 
   // Remittance styles removed - now handled by payment method selection
 
@@ -915,7 +960,22 @@ const styles = StyleSheet.create({
     color: '#3B82F6',
   },
 
-  // 🔄 Loading States
+  // 🔄 Loading States - Skeleton
+  activitySkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    gap: 16,
+    marginBottom: 12,
+  },
+  skeletonContent: {
+    flex: 1,
+    gap: 6,
+  },
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 48,

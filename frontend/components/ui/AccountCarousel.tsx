@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { bankingService } from '../../lib/bankingService';
 import type { BankAccount, AccountBalance } from '../../types/banking';
+import { SkeletonLoader } from './SkeletonLoader';
 
 const { width: screenWidth } = Dimensions.get('window');
 // Perfect edge-to-edge alignment: cards span full screen width with internal padding
@@ -108,9 +109,15 @@ const AccountCard: React.FC<AccountCardProps> = ({
       {/* Balance Section */}
       <View style={styles.balanceSection}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
-        <Text style={styles.balanceAmount}>
-          {balance ? bankingService.formatAmount(balance.amount, account.currency) : '---'}
-        </Text>
+        {balance ? (
+          <Text style={styles.balanceAmount}>
+            {bankingService.formatAmount(balance.amount, account.currency)}
+          </Text>
+        ) : (
+          <View style={styles.balanceAmount}>
+            <SkeletonLoader width={120} height={20} borderRadius={10} />
+          </View>
+        )}
         
         {/* Last Updated */}
         <View style={styles.lastUpdated}>
@@ -446,6 +453,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 4,
     textAlign: 'center',
+    minHeight: 35, // Prevent height changes during loading
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   lastUpdated: {
     flexDirection: 'row',

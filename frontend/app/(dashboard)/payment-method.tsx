@@ -7,7 +7,6 @@ import { useWalletStore } from '../../lib/walletStore';
 import { useAuthStore } from '../../lib/auth';
 
 export default function PaymentMethodScreen() {
-  const { currency } = useLocalSearchParams<{ currency?: string }>();
   const { selectedAccount, accounts, refreshBalance } = useWalletStore();
   const { user } = useAuthStore();
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);

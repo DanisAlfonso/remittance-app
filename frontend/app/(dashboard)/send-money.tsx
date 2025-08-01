@@ -94,9 +94,11 @@ export default function SendMoneyScreen() {
         console.log(`Transfer ${index}:`, {
           id: transfer.id,
           sourceAmount: transfer.sourceAmount,
+          sourceCurrency: transfer.sourceCurrency,
           targetCurrency: transfer.targetCurrency,
           recipient: transfer.recipient,
           description: transfer.description,
+          metadata: transfer.metadata,
           createdAt: transfer.createdAt
         });
       });
@@ -166,10 +168,21 @@ export default function SendMoneyScreen() {
             const recipientKey = recipientIban || recipientAccountNumber || recipientName;
             const existing = recipientMap.get(recipientKey);
             
+            console.log(`🔍 Processing recipient: ${recipientName}`, {
+              recipientIban,
+              recipientUserId,
+              recipientUsername,
+              isInternalUser,
+              lastTransferAmount,
+              sourceCurrency: transfer.sourceCurrency,
+              targetCurrency: transfer.targetCurrency,
+              metadata: transfer.metadata
+            });
+            
             // Keep the most recent transfer for each recipient
             if (!existing || new Date(transfer.createdAt) > new Date(existing.lastUsed)) {
               const recipientCountry = getCountryFromCurrency(transfer.targetCurrency);
-              recipientMap.set(recipientKey, {
+              const newRecipient = {
                 id: recipientKey,
                 name: recipientName,
                 email: recipientName, // Use name as fallback for email
@@ -187,7 +200,10 @@ export default function SendMoneyScreen() {
                 transferId: transfer.id,
                 sourceAmount: Math.abs(transfer.sourceAmount || 0),
                 sourceCurrency: transfer.sourceCurrency
-              });
+              };
+              
+              console.log(`✅ Added/Updated recipient: ${recipientName}`, newRecipient);
+              recipientMap.set(recipientKey, newRecipient);
             }
           }
         }
@@ -288,6 +304,12 @@ export default function SendMoneyScreen() {
 
   const handleSendAgain = (recipient: Recipient) => {
     console.log('🔄 Send Again pressed for:', recipient.name);
+    console.log('🔄 Send Again details:', {
+      amount: recipient.lastTransferAmount,
+      sourceCurrency: recipient.sourceCurrency,
+      targetCurrency: recipient.currency,
+      isInternalUser: recipient.isInternalUser
+    });
     
     // Navigate directly to transfer amount with pre-filled amount and recipient
     if (recipient.isInternalUser && recipient.userId) {
@@ -299,7 +321,7 @@ export default function SendMoneyScreen() {
           recipientName: recipient.name,
           recipientUsername: recipient.username || '',
           transferType: 'user', // @username transfer
-          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR',
+          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR', // Currency we're sending FROM
           prefillAmount: recipient.lastTransferAmount?.toString() || '',
           fromSendAgain: 'true'
         }
@@ -310,7 +332,7 @@ export default function SendMoneyScreen() {
         type: 'iban',
         holderName: recipient.name,
         iban: recipient.iban || '',
-        currency: recipient.currency,
+        currency: recipient.currency, // Currency recipient receives
         country: recipient.country,
         bankName: 'Bank Transfer',
       };
@@ -318,7 +340,7 @@ export default function SendMoneyScreen() {
       router.push({
         pathname: '/(dashboard)/transfer-amount',
         params: {
-          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR',
+          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR', // Currency we're sending FROM
           recipientData: JSON.stringify(recipientData),
           prefillAmount: recipient.lastTransferAmount?.toString() || '',
           fromSendAgain: 'true'
@@ -329,6 +351,13 @@ export default function SendMoneyScreen() {
 
   const handleRecipientCardPress = (recipient: Recipient) => {
     console.log('💳 Recipient card pressed:', recipient.name, 'isInternalUser:', recipient.isInternalUser);
+    console.log('💳 Recipient details:', {
+      sourceCurrency: recipient.sourceCurrency,
+      targetCurrency: recipient.currency,
+      userId: recipient.userId,
+      username: recipient.username,
+      iban: recipient.iban
+    });
     
     if (recipient.isInternalUser && recipient.userId) {
       // Internal user - use @username transfer for proper handling
@@ -339,7 +368,7 @@ export default function SendMoneyScreen() {
           recipientName: recipient.name,
           recipientUsername: recipient.username || '',
           transferType: 'user', // @username transfer
-          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR'
+          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR' // Currency we're sending FROM
         }
       });
     } else {
@@ -348,7 +377,7 @@ export default function SendMoneyScreen() {
         type: 'iban',
         holderName: recipient.name,
         iban: recipient.iban || '',
-        currency: recipient.currency,
+        currency: recipient.currency, // Currency recipient receives
         country: recipient.country,
         bankName: 'Bank Transfer',
       };
@@ -356,7 +385,7 @@ export default function SendMoneyScreen() {
       router.push({
         pathname: '/(dashboard)/transfer-amount',
         params: {
-          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR',
+          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR', // Currency we're sending FROM
           recipientData: JSON.stringify(recipientData)
         }
       });
@@ -849,9 +878,9 @@ export default function SendMoneyScreen() {
                     </View>
                   </View>
                   <View style={styles.methodInfo}>
-                    <Text style={styles.premiumMethodTitle}>To App User</Text>
+                    <Text style={styles.premiumMethodTitle}>Send to Contact</Text>
                     <Text style={styles.premiumMethodSubtitle}>
-                      Send to another {selectedCurrency} account holder
+                      Send money instantly using @username
                     </Text>
                     <View style={styles.methodFeatures}>
                       <View style={styles.methodFeature}>

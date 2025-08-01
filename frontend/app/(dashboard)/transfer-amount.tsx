@@ -125,21 +125,31 @@ export default function TransferAmountScreen() {
   
   const currency = params.currency as string;
   
-  // Handle both JSON recipientData (from add-recipient) and individual params (from user-search/QR)
+  // Handle both JSON recipientData (from add-recipient) and individual params (from user-search/QR/Recent Recipients)
   const recipientData: Partial<RecipientData> = params.recipientData 
     ? JSON.parse(params.recipientData as string) as RecipientData
     : {
-        // From user search or QR scan - this will be @username transfer
+        // From user search, QR scan, or Recent Recipients - this will be @username transfer
         id: params.recipientId as string,
         name: params.recipientName as string,
-        type: 'user', // @username transfer type
+        type: params.transferType as string || 'user', // Use transferType from params or default to 'user'
         currency: params.currency as string,
         username: params.recipientUsername as string || undefined,
-        // IBAN will be fetched dynamically
-        holderName: '', // Will be populated
+        // IBAN will be fetched dynamically for @username transfers
+        holderName: params.recipientName as string || '', // Will be populated for @username transfers
         iban: '', // Will be populated
         country: '', // Will be populated
       };
+  
+  console.log('🎯 Transfer Amount Screen - Recipient Data:', {
+    hasRecipientData: !!params.recipientData,
+    recipientId: params.recipientId,
+    recipientName: params.recipientName,
+    recipientUsername: params.recipientUsername,
+    transferType: params.transferType,
+    currency: params.currency,
+    parsedRecipientData: recipientData
+  });
   
   const [amount, setAmount] = useState('');
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null);
@@ -164,7 +174,7 @@ export default function TransferAmountScreen() {
     }
   }, [params.prefillAmount]);
 
-  // Handle username lookup for QR code scanning
+  // Handle recipient resolution (username lookup, IBAN fetching, etc.)
   useEffect(() => {
     const resolveRecipient = async () => {
       // If we have username but no ID (QR code scenario), look up the user
@@ -199,14 +209,46 @@ export default function TransferAmountScreen() {
         } finally {
           setIsLoadingRecipient(false);
         }
-      } else if (recipientData.id) {
-        // We already have complete recipient data
+      } else if (recipientData.id && recipientData.type === 'user' && !recipientData.iban && !isLoadingRecipient) {
+        // We have a user ID (from Recent Recipients) but need to fetch their IBAN
+        setIsLoadingRecipient(true);
+        try {
+          console.log('🔍 Fetching IBAN for user ID:', recipientData.id);
+          const userIbanData = await fetchUserIban(recipientData.id);
+          
+          console.log('✅ Found user IBAN data:', userIbanData);
+          
+          // Update recipient data with IBAN info
+          const updatedRecipientData: RecipientData = {
+            ...recipientData as RecipientData,
+            holderName: userIbanData.holderName,
+            iban: userIbanData.iban,
+            country: userIbanData.country,
+            currency: userIbanData.currency
+          };
+          
+          setResolvedRecipient(updatedRecipientData);
+        } catch (error) {
+          console.error('❌ Failed to fetch user IBAN:', error);
+          Alert.alert(
+            'Error',
+            'Unable to get recipient account information. Please try again.',
+            [
+              { text: 'OK', onPress: () => router.back() }
+            ]
+          );
+        } finally {
+          setIsLoadingRecipient(false);
+        }
+      } else if (recipientData.id || recipientData.iban) {
+        // We already have complete recipient data (IBAN transfer or complete user data)
+        console.log('✅ Using existing recipient data:', recipientData);
         setResolvedRecipient(recipientData as RecipientData);
       }
     };
 
     resolveRecipient();
-  }, [recipientData.username, recipientData.id]);
+  }, [recipientData.username, recipientData.id, recipientData.iban, recipientData.type]);
 
   const loadExchangeRate = async () => {
     if (!selectedAccount || !token) {

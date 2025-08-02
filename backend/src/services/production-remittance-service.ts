@@ -180,6 +180,22 @@ export class ProductionRemittanceService {
       
       const result = await prisma.$transaction(async (tx) => {
         
+        // Create comprehensive recipient metadata (same format as master-account-banking.ts)
+        const recipientMetadata = {
+          recipientName: request.recipientName,
+          recipientIban: '', // HNL accounts don't use IBAN format
+          recipientAccountId: request.recipientAccountId,
+          recipientUserId: null, // External recipient
+          recipientUsername: null,
+          isInternalUser: false,
+          transferPurpose: request.description || 'EUR → HNL remittance',
+          transferAmount: hnlAmount, // Target amount in HNL
+          transferCurrency: 'HNL',
+          sourceCurrency: 'EUR',
+          targetCurrency: 'HNL',
+          exchangeRate: customerRate
+        };
+
         // Create transaction record
         const transaction = await tx.transaction.create({
           data: {
@@ -194,7 +210,8 @@ export class ProductionRemittanceService {
             platformFee: platformFee,
             providerFee: 0,
             totalFee: platformFee,
-            providerReference: `EUR→HNL to ${request.recipientName || 'Honduras'} (${request.recipientAccountId})`
+            providerReference: `EUR→HNL to ${request.recipientName || 'Honduras'} (${request.recipientAccountId})`,
+            metadata: JSON.stringify(recipientMetadata)
           }
         });
 

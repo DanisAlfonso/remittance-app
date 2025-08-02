@@ -369,9 +369,9 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
         },
         sourceAmount: sourceAmount,
         sourceCurrency: tx.currency || 'EUR',
-        targetAmount: sourceAmount, // Same as source amount (with correct sign)
-        targetCurrency: tx.currency || 'EUR', // Same as source for now
-        exchangeRate: 1, // No exchange for same currency
+        targetAmount: tx.targetAmount ? parseFloat(tx.targetAmount.toString()) : Math.abs(sourceAmount),
+        targetCurrency: tx.targetCurrency || tx.currency || 'EUR',
+        exchangeRate: tx.exchangeRate ? parseFloat(tx.exchangeRate.toString()) : 1,
         fee: tx.totalFee ? parseFloat(tx.totalFee.toString()) : 0,
         reference: tx.referenceNumber || undefined,
         description: tx.description || `${tx.type || 'Transfer'} - ${tx.currency || 'EUR'} ${tx.amount}`,

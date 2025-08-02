@@ -303,14 +303,18 @@ export default function DashboardScreen() {
         const intervalToken = useAuthStore.getState().token;
         
         if (intervalUser && intervalToken) {
-          if (__DEV__) console.log('⏰ Auto-refreshing dashboard data (2-minute interval)...');
+          if (__DEV__) {
+            console.log('⏰ Auto-refreshing dashboard data (2-minute interval)...');
+          }
           refreshAllData();
         }
       }, 2 * 60 * 1000); // 2 minutes
 
       // Cleanup interval when screen loses focus
       return () => {
-        if (__DEV__) console.log('🛑 Stopping auto-refresh (screen unfocused)');
+        if (__DEV__) {
+          console.log('🛑 Stopping auto-refresh (screen unfocused)');
+        }
         clearInterval(autoRefreshInterval);
       };
     }, [refreshAllData])

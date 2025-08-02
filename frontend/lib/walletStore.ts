@@ -103,7 +103,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       },
 
       loadAccounts: async () => {
-        const { userId, selectedAccount } = get();
+        const { selectedAccount } = get();
         // Loading accounts for user (log disabled for performance)
         set({ isLoading: true, error: null });
         
@@ -123,7 +123,9 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           // select the first available account
           if (!newSelectedAccount && response.accounts.length > 0) {
             newSelectedAccount = response.accounts[0];
-            if (__DEV__) console.log(`🔄 Auto-selecting first account: ${newSelectedAccount.currency} (${newSelectedAccount.id})`);
+            if (__DEV__) {
+              console.log(`🔄 Auto-selecting first account: ${newSelectedAccount.currency} (${newSelectedAccount.id})`);
+            }
           }
           
           set({
@@ -165,7 +167,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       },
 
       refreshBalance: async (accountId?: string) => {
-        const { selectedAccount, userId, accountBalances } = get();
+        const { selectedAccount, accountBalances } = get();
         const targetAccountId = accountId || selectedAccount?.id;
         
         if (!targetAccountId) {
@@ -224,7 +226,9 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       updateAccountBalance: (accountId: string, newBalance: number) => {
         const { accounts, selectedAccount, balance } = get();
         
-        if (__DEV__) console.log(`💰 Updating account balance: ${accountId} → ${newBalance}`);
+        if (__DEV__) {
+          console.log(`💰 Updating account balance: ${accountId} → ${newBalance}`);
+        }
         
         // Update the account in the accounts list
         const updatedAccounts = accounts.map(account => 
@@ -257,7 +261,9 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           balance: updatedBalance
         });
         
-        if (__DEV__) console.log(`✅ Account balance updated successfully`);
+        if (__DEV__) {
+          console.log(`✅ Account balance updated successfully`);
+        }
       },
 
       getAccountBalance: (accountId: string) => {
@@ -296,7 +302,9 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       setUserId: async (userId: string | null) => {
         const currentUserId = get().userId;
         if (currentUserId !== userId) {
-          if (__DEV__) console.log('Wallet: User changed, clearing all data and storage');
+          if (__DEV__) {
+            console.log('Wallet: User changed, clearing all data and storage');
+          }
           // User changed - reset all data AND clear storage
           set({
             accounts: [],
@@ -349,7 +357,9 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           return;
         }
         if (state) {
-          if (__DEV__) console.log('Wallet store rehydrated with userId:', state.userId);
+          if (__DEV__) {
+            console.log('Wallet store rehydrated with userId:', state.userId);
+          }
           // Additional validation can be added here if needed
         }
       },

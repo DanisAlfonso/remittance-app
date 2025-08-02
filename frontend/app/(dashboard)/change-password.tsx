@@ -65,7 +65,7 @@ export default function ChangePasswordScreen() {
     setLoading(true);
     try {
       // TODO: Implement API call to change password
-      // This would typically make a request to /api/v1/auth/change-password
+      // This would typically make a request to /obp/v5.1.0/users/current/change-password
       
       Alert.alert(
         'Success', 

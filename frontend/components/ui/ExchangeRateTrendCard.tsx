@@ -250,12 +250,8 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 thickness={2}
                 
                 // Show only today's data point - hide all others
-                hideDataPoints={false}
                 dataPointsColor={getTrendColor()}
-                hideDataPoint={trendData.map((_, index) => {
-                  const isToday = index === trendData.length - 1;
-                  return !isToday; // Hide all points except the last one (today)
-                })}
+                hideDataPoints={false}
                 dataPointsRadius={6}
                 dataPointsHeight={12}
                 dataPointsWidth={12}

@@ -87,7 +87,9 @@ class RemittanceService {
    */
   async executeRemittance(request: RemittanceRequest): Promise<RemittanceResult> {
     try {
-      if (__DEV__) console.log('🌟 [REMITTANCE] Executing EUR → HNL transfer:', request);
+      if (__DEV__) {
+        console.log('🌟 [REMITTANCE] Executing EUR → HNL transfer:', request);
+      }
       
       const response = await apiClient.post<{
         success: boolean;
@@ -143,7 +145,9 @@ class RemittanceService {
    */
   async getExchangeRate(amountEUR: number): Promise<ExchangeRateResult> {
     try {
-      if (__DEV__) console.log('💱 [REMITTANCE] Getting EUR/HNL exchange rate for:', amountEUR);
+      if (__DEV__) {
+        console.log('💱 [REMITTANCE] Getting EUR/HNL exchange rate for:', amountEUR);
+      }
       
       const response = await apiClient.get<{
         success: boolean;
@@ -153,13 +157,17 @@ class RemittanceService {
       }>(`/remittance/exchange-rate?amount=${amountEUR}`);
 
       if (response.success && response.data) {
-        if (__DEV__) console.log('✅ [REMITTANCE] Exchange rate:', response.data.customerRate, 'HNL/EUR');
+        if (__DEV__) {
+          console.log('✅ [REMITTANCE] Exchange rate:', response.data.customerRate, 'HNL/EUR');
+        }
         return {
           success: true,
           data: response.data
         };
       } else {
-        if (__DEV__) console.error('❌ [REMITTANCE] Exchange rate failed:', response.error);
+        if (__DEV__) {
+          console.error('❌ [REMITTANCE] Exchange rate failed:', response.error);
+        }
         return {
           success: false,
           error: {
@@ -196,7 +204,9 @@ class RemittanceService {
    */
   async getHNLRecipients(): Promise<{ success: boolean; recipients: HNLRecipient[]; error?: string }> {
     try {
-      if (__DEV__) console.log('👥 [REMITTANCE] Loading HNL recipients...');
+      if (__DEV__) {
+        console.log('👥 [REMITTANCE] Loading HNL recipients...');
+      }
       
       // Return the HNLBANK recipients (where accounts have actual funds)
       // These match the backend configuration that sends to HNLBANK
@@ -233,7 +243,9 @@ class RemittanceService {
         }
       ];
 
-      if (__DEV__) console.log('✅ [REMITTANCE] Loaded', recipients.length, 'HNL recipients');
+      if (__DEV__) {
+        console.log('✅ [REMITTANCE] Loaded', recipients.length, 'HNL recipients');
+      }
       return {
         success: true,
         recipients

@@ -63,7 +63,7 @@ export default function DirectPaymentScreen() {
     setIsLoadingRecipients(true);
     try {
       // Load HNL recipients from beneficiaries
-      const response = await apiClient.get('/api/v1/beneficiaries') as {
+      const response = await apiClient.get('/obp/v5.1.0/remittance/recipients') as {
         success: boolean;
         data?: {
           beneficiaries: Array<{
@@ -102,7 +102,7 @@ export default function DirectPaymentScreen() {
   const loadExchangeRate = async () => {
     setIsLoadingRate(true);
     try {
-      const response = await apiClient.get('/api/v1/exchange-rates/EUR/HNL') as {
+      const response = await apiClient.get('/obp/v5.1.0/remittance/exchange-rate?amount=1') as {
         success: boolean;
         data?: { rate: number };
       };
@@ -149,7 +149,7 @@ export default function DirectPaymentScreen() {
 
     try {
       // Call production remittance API
-      const response = await apiClient.post('/api/v1/remittance/production', {
+      const response = await apiClient.post('/obp/v5.1.0/remittance/send', {
         recipientAccountId: selectedRecipient.accountNumber,
         amountEUR: parseFloat(amount),
         description: `Direct payment to ${selectedRecipient.name} - €${amount}`,

@@ -236,6 +236,40 @@ export default function SendMoneyScreen() {
     return currencyCountryMap[currency] || 'XX';
   };
 
+  const getTransferTypeLabel = (sourceCurrency?: string, targetCurrency?: string): string => {
+    const source = sourceCurrency || 'EUR';
+    const target = targetCurrency || 'EUR';
+    
+    if (source === target) {
+      return `${source} → ${target}`;
+    }
+    
+    // International transfers
+    if (source === 'EUR' && target === 'HNL') {
+      return 'EUR → HNL';
+    } else if (source === 'HNL' && target === 'EUR') {
+      return 'HNL → EUR';
+    } else if (source === 'EUR' && target !== 'EUR') {
+      return `EUR → ${target}`;
+    } else if (target === 'EUR' && source !== 'EUR') {
+      return `${source} → EUR`;
+    }
+    
+    return `${source} → ${target}`;
+  };
+
+  const getTransferTypeColor = (sourceCurrency?: string, targetCurrency?: string): string => {
+    const source = sourceCurrency || 'EUR';
+    const target = targetCurrency || 'EUR';
+    
+    if (source === target) {
+      return '#059669'; // Green for same currency
+    }
+    
+    // International transfers
+    return '#3B82F6'; // Blue for currency conversion
+  };
+
   const formatRelativeTime = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
@@ -302,94 +336,19 @@ export default function SendMoneyScreen() {
     }
   };
 
-  const handleSendAgain = (recipient: Recipient) => {
-    console.log('🔄 Send Again pressed for:', recipient.name);
-    console.log('🔄 Send Again details:', {
-      amount: recipient.lastTransferAmount,
-      sourceCurrency: recipient.sourceCurrency,
-      targetCurrency: recipient.currency,
-      isInternalUser: recipient.isInternalUser
-    });
-    
-    // Navigate directly to transfer amount with pre-filled amount and recipient
-    if (recipient.isInternalUser && recipient.userId) {
-      // Internal user - use @username transfer
-      router.push({
-        pathname: '/(dashboard)/transfer-amount',
-        params: {
-          recipientId: recipient.userId,
-          recipientName: recipient.name,
-          recipientUsername: recipient.username || '',
-          transferType: 'user', // @username transfer
-          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR', // Currency we're sending FROM
-          prefillAmount: recipient.lastTransferAmount?.toString() || '',
-          fromSendAgain: 'true'
-        }
-      });
-    } else {
-      // External recipient - use IBAN transfer
-      const recipientData = {
-        type: 'iban',
-        holderName: recipient.name,
-        iban: recipient.iban || '',
-        currency: recipient.currency, // Currency recipient receives
-        country: recipient.country,
-        bankName: 'Bank Transfer',
-      };
-      
-      router.push({
-        pathname: '/(dashboard)/transfer-amount',
-        params: {
-          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR', // Currency we're sending FROM
-          recipientData: JSON.stringify(recipientData),
-          prefillAmount: recipient.lastTransferAmount?.toString() || '',
-          fromSendAgain: 'true'
-        }
-      });
-    }
-  };
 
   const handleRecipientCardPress = (recipient: Recipient) => {
-    console.log('💳 Recipient card pressed:', recipient.name, 'isInternalUser:', recipient.isInternalUser);
-    console.log('💳 Recipient details:', {
-      sourceCurrency: recipient.sourceCurrency,
-      targetCurrency: recipient.currency,
-      userId: recipient.userId,
-      username: recipient.username,
-      iban: recipient.iban
-    });
+    console.log('💳 Recipient card pressed - navigating to transaction details:', recipient.name);
     
-    if (recipient.isInternalUser && recipient.userId) {
-      // Internal user - use @username transfer for proper handling
-      router.push({
-        pathname: '/(dashboard)/transfer-amount',
-        params: {
-          recipientId: recipient.userId,
-          recipientName: recipient.name,
-          recipientUsername: recipient.username || '',
-          transferType: 'user', // @username transfer
-          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR' // Currency we're sending FROM
-        }
-      });
-    } else {
-      // External recipient - use IBAN transfer
-      const recipientData = {
-        type: 'iban',
-        holderName: recipient.name,
-        iban: recipient.iban || '',
-        currency: recipient.currency, // Currency recipient receives
-        country: recipient.country,
-        bankName: 'Bank Transfer',
-      };
-      
-      router.push({
-        pathname: '/(dashboard)/transfer-amount',
-        params: {
-          currency: recipient.sourceCurrency || selectedAccount?.currency || 'EUR', // Currency we're sending FROM
-          recipientData: JSON.stringify(recipientData)
-        }
-      });
-    }
+    // Navigate to transaction details screen
+    router.push({
+      pathname: '/(dashboard)/transaction-details',
+      params: {
+        transferId: recipient.transferId || '',
+        recipientName: recipient.name,
+        recipientCurrency: recipient.currency
+      }
+    });
   };
 
   // Filter recipients based on active tab and search query
@@ -643,59 +602,58 @@ export default function SendMoneyScreen() {
                   activeOpacity={0.98}
                 >
                   <View style={styles.recipientCardContent}>
-                    <View style={styles.recipientLeft}>
-                      <View style={styles.premiumAvatar}>
-                        <Text style={styles.premiumInitials}>
-                          {recipient.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={styles.recipientInfo}>
-                        <View style={styles.recipientNameRow}>
-                          <Text style={styles.premiumRecipientName}>{recipient.name}</Text>
-                          {recipient.currency === 'HNL' && (
-                            <View style={styles.countryFlag}>
-                              <Text style={styles.flagEmoji}>🇭🇳</Text>
+                    <View style={styles.recipientTopRow}>
+                      <View style={styles.recipientMainInfo}>
+                        <View style={styles.premiumAvatar}>
+                          <Text style={styles.premiumInitials}>
+                            {recipient.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.recipientNameSection}>
+                          <Text style={styles.premiumRecipientName} numberOfLines={1} ellipsizeMode="tail">
+                            {recipient.name}
+                          </Text>
+                          <View style={styles.recipientMeta}>
+                            <View style={styles.transferTypeChip}>
+                              <Text style={[styles.transferTypeText, { color: getTransferTypeColor(recipient.sourceCurrency, recipient.currency) }]}>
+                                {getTransferTypeLabel(recipient.sourceCurrency, recipient.currency)}
+                              </Text>
                             </View>
-                          )}
-                        </View>
-                        <View style={styles.recipientMeta}>
-                          <View style={styles.currencyChip}>
-                            <Text style={styles.currencyChipText}>{recipient.currency}</Text>
+                            <View style={styles.metaDot} />
+                            <Text style={styles.lastUsedText}>{recipient.lastUsed}</Text>
                           </View>
-                          <View style={styles.metaDot} />
-                          <Text style={styles.lastUsedText}>{recipient.lastUsed}</Text>
                         </View>
                       </View>
+                      <TouchableOpacity 
+                        style={styles.favoriteButtonProminent}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(recipient.id);
+                        }}
+                      >
+                        <Ionicons 
+                          name={recipient.isFavorite ? "star" : "star-outline"} 
+                          size={18} 
+                          color={recipient.isFavorite ? "#F59E0B" : "#D1D5DB"} 
+                        />
+                      </TouchableOpacity>
                     </View>
-                    <View style={styles.recipientRight}>
-                      <View style={styles.recipientActions}>
-                        <TouchableOpacity 
-                          style={styles.favoriteButton}
-                          onPress={(e) => {
-                            e.stopPropagation(); // Prevent triggering the main card press
-                            toggleFavorite(recipient.id);
-                          }}
-                        >
-                          <Ionicons 
-                            name={recipient.isFavorite ? "star" : "star-outline"} 
-                            size={20} 
-                            color={recipient.isFavorite ? "#F59E0B" : "#9CA3AF"} 
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.sendAgainButton}
-                          onPress={(e) => {
-                            e.stopPropagation(); // Prevent triggering the main card press
-                            handleSendAgain(recipient);
-                          }}
-                        >
-                          <Ionicons name="repeat" size={16} color="#3B82F6" />
-                          <Text style={styles.sendAgainText}>Send Again</Text>
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.chevronContainer}>
-                        <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
-                      </View>
+                    <View style={styles.lastTransferInfo}>
+                      <Text style={styles.lastTransferLabel}>Last sent:</Text>
+                      <Text style={styles.lastTransferAmount}>
+                        {(() => {
+                          const amount = recipient.lastTransferAmount || recipient.sourceAmount || 0;
+                          if (amount > 0) {
+                            return new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: recipient.sourceCurrency || 'EUR',
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            }).format(amount);
+                          }
+                          return '€0.00';
+                        })()}
+                      </Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -1372,9 +1330,23 @@ const styles = StyleSheet.create({
     borderColor: '#F8FAFC',
   },
   recipientCardContent: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  recipientTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  recipientMainInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
+    gap: 16,
+  },
+  recipientNameSection: {
+    flex: 1,
+    minWidth: 0,
   },
   recipientLeft: {
     flexDirection: 'row',
@@ -1391,6 +1363,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#E0E7FF',
+    alignSelf: 'center',
   },
   premiumInitials: {
     fontSize: 18,
@@ -1400,44 +1373,39 @@ const styles = StyleSheet.create({
   },
   recipientInfo: {
     flex: 1,
+    minWidth: 0, // Allow text to wrap/truncate properly
   },
   recipientNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     marginBottom: 8,
+    maxWidth: '100%',
   },
   premiumRecipientName: {
     fontSize: 17,
     fontWeight: '700',
     color: '#1E3A8A',
     letterSpacing: -0.2,
-  },
-  countryFlag: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FEF3C7',
+    flexShrink: 1,
   },
   recipientMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 4,
   },
-  currencyChip: {
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 8,
+  transferTypeChip: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: '#E2E8F0',
   },
-  currencyChipText: {
+  transferTypeText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#166534',
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
   metaDot: {
     width: 4,
@@ -1446,18 +1414,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#D1D5DB',
   },
   lastUsedText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  lastTransferInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  lastTransferLabel: {
     fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
   },
-  recipientRight: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  recipientActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  lastTransferAmount: {
+    fontSize: 15,
+    color: '#059669',
+    fontWeight: '700',
   },
   favoriteButton: {
     width: 32,
@@ -1469,22 +1444,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  sendAgainButton: {
-    flexDirection: 'row',
+  favoriteButtonProminent: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 6,
-  },
-  sendAgainText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#3B82F6',
-  },
-  chevronContainer: {
-    padding: 4,
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 2,
   },
 
   // 🎭 Loading States
@@ -1622,9 +1590,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
     textAlign: 'center',
-  },
-  flagEmoji: {
-    fontSize: 14,
   },
 
   // 🎯 Methods Section

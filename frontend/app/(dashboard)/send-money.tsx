@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -89,19 +89,7 @@ export default function SendMoneyScreen() {
       const response = await transferService.getTransferHistory(10, 0); // Get last 10 transfers
       const transfers = response.transfers || [];
       
-      console.log('📋 Found', transfers.length, 'transfers');
-      transfers.forEach((transfer, index) => {
-        console.log(`Transfer ${index}:`, {
-          id: transfer.id,
-          sourceAmount: transfer.sourceAmount,
-          sourceCurrency: transfer.sourceCurrency,
-          targetCurrency: transfer.targetCurrency,
-          recipient: transfer.recipient,
-          description: transfer.description,
-          metadata: transfer.metadata,
-          createdAt: transfer.createdAt
-        });
-      });
+      // Found transfers (log disabled for performance)
       
       // Extract unique recipients from outgoing transfers
       const recipientMap = new Map<string, Recipient>();
@@ -168,16 +156,7 @@ export default function SendMoneyScreen() {
             const recipientKey = recipientIban || recipientAccountNumber || recipientName;
             const existing = recipientMap.get(recipientKey);
             
-            console.log(`🔍 Processing recipient: ${recipientName}`, {
-              recipientIban,
-              recipientUserId,
-              recipientUsername,
-              isInternalUser,
-              lastTransferAmount,
-              sourceCurrency: transfer.sourceCurrency,
-              targetCurrency: transfer.targetCurrency,
-              metadata: transfer.metadata
-            });
+            // Processing recipient (log disabled for performance)
             
             // Keep the most recent transfer for each recipient
             if (!existing || new Date(transfer.createdAt) > new Date(existing.lastUsed)) {
@@ -202,7 +181,7 @@ export default function SendMoneyScreen() {
                 sourceCurrency: transfer.sourceCurrency
               };
               
-              console.log(`✅ Added/Updated recipient: ${recipientName}`, newRecipient);
+              // Added/Updated recipient (log disabled for performance)
               recipientMap.set(recipientKey, newRecipient);
             }
           }
@@ -211,7 +190,7 @@ export default function SendMoneyScreen() {
       
       // Convert to array and sort by most recent
       const recipients = Array.from(recipientMap.values()).slice(0, 5); // Show max 5 recent recipients
-      console.log('✅ Extracted', recipients.length, 'unique recipients:', recipients.map(r => r.name));
+      // Extracted unique recipients (log disabled for performance)
       setRecentRecipients(recipients);
     } catch (error) {
       console.error('❌ Error loading recent recipients:', error);
@@ -351,8 +330,8 @@ export default function SendMoneyScreen() {
     });
   };
 
-  // Filter recipients based on active tab and search query
-  const getFilteredRecipients = () => {
+  // Memoized recipient filtering to prevent repeated operations
+  const filteredRecipients = useMemo(() => {
     let filtered = recentRecipients;
 
     // CURRENCY CONTEXT FILTERING: Only show recipients from the same currency context
@@ -360,8 +339,10 @@ export default function SendMoneyScreen() {
     const currentCurrency = selectedAccount?.currency;
     if (currentCurrency) {
       filtered = filtered.filter(r => r.sourceCurrency === currentCurrency);
-      console.log(`🎯 Filtering recipients by currency context: ${currentCurrency}`);
-      console.log(`📋 Filtered ${recentRecipients.length} recipients to ${filtered.length} matching currency`);
+      if (__DEV__) {
+        console.log(`🎯 Filtering recipients by currency context: ${currentCurrency}`);
+        console.log(`📋 Filtered ${recentRecipients.length} recipients to ${filtered.length} matching currency`);
+      }
     }
 
     // Filter by tab
@@ -390,7 +371,7 @@ export default function SendMoneyScreen() {
     }
 
     return filtered;
-  };
+  }, [recentRecipients, selectedAccount?.currency, activeTab, searchQuery]);
 
   const handleTabPress = (tab: 'favorites' | 'recent' | 'international') => {
     setActiveTab(tab);
@@ -528,7 +509,7 @@ export default function SendMoneyScreen() {
                  'Recent Recipients'}
               </Text>
               <View style={styles.sectionBadge}>
-                <Text style={styles.sectionBadgeText}>{getFilteredRecipients().length}</Text>
+                <Text style={styles.sectionBadgeText}>{filteredRecipients.length}</Text>
               </View>
             </View>
             
@@ -596,14 +577,14 @@ export default function SendMoneyScreen() {
             </View>
 
             {/* Enhanced Recipient Cards */}
-            {getFilteredRecipients().length > 0 ? (
+            {filteredRecipients.length > 0 ? (
               <View style={styles.recipientsList}>
-                {getFilteredRecipients().map((recipient, index) => (
+                {filteredRecipients.map((recipient, index) => (
                 <TouchableOpacity 
                   key={recipient.id} 
                   style={[
                     styles.premiumRecipientCard,
-                    { marginBottom: index === getFilteredRecipients().length - 1 ? 0 : 12 }
+                    { marginBottom: index === filteredRecipients.length - 1 ? 0 : 12 }
                   ]}
                   onPress={() => {
                     handleRecipientCardPress(recipient);
@@ -1031,9 +1012,9 @@ export default function SendMoneyScreen() {
           </View>
 
           <ScrollView style={styles.searchResults}>
-            {getFilteredRecipients().length > 0 ? (
+            {filteredRecipients.length > 0 ? (
               <View style={styles.searchResultsList}>
-                {getFilteredRecipients().map((recipient) => (
+                {filteredRecipients.map((recipient) => (
                   <TouchableOpacity
                     key={recipient.id}
                     style={styles.searchResultItem}

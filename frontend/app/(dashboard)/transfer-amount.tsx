@@ -141,15 +141,7 @@ export default function TransferAmountScreen() {
         country: '', // Will be populated
       };
   
-  console.log('🎯 Transfer Amount Screen - Recipient Data:', {
-    hasRecipientData: !!params.recipientData,
-    recipientId: params.recipientId,
-    recipientName: params.recipientName,
-    recipientUsername: params.recipientUsername,
-    transferType: params.transferType,
-    currency: params.currency,
-    parsedRecipientData: recipientData
-  });
+  // Transfer Amount Screen - Recipient Data (log disabled for performance)
   
   const [amount, setAmount] = useState('');
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null);

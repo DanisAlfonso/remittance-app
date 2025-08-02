@@ -55,7 +55,7 @@ export default function TransactionDetailsScreen() {
         return;
       }
 
-      console.log('📋 Found transfer for details:', JSON.stringify(foundTransfer, null, 2));
+      // Found transfer for details (log disabled for performance)
       setTransfer(foundTransfer);
       
       // Extract recipient information

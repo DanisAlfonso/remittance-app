@@ -26,17 +26,7 @@ export default function TransactionsScreen() {
       setError(null);
       const response = await transferService.getTransferHistory(50, 0); // Load more transactions
       
-      // Debug: Log the transfer data to understand the issue
-      console.log('🔍 Debug: Transfer data received:', response.transfers);
-      response.transfers.forEach((transfer, index) => {
-        console.log(`Transfer ${index}:`, {
-          id: transfer.id,
-          sourceAmount: transfer.sourceAmount,
-          sourceCurrency: transfer.sourceCurrency,
-          description: transfer.description,
-          type: transfer.sourceAmount > 0 ? 'receive' : 'send'
-        });
-      });
+      // Debug: Transfer data received (log disabled for performance)
       
       setTransfers(response.transfers);
       

@@ -55,11 +55,7 @@ export default function DashboardScreen() {
       setIsLoadingTransfers(true);
     }
     try {
-      console.log('🔍 Loading recent transfers with auth token...', {
-        hasToken: !!token,
-        tokenLength: token?.length || 0,
-        tokenPrefix: token?.substring(0, 20) + '...'
-      });
+      // Loading recent transfers with auth token (log disabled for performance)
       
       // Ensure API client has the token
       apiClient.setAuthToken(token);
@@ -67,7 +63,7 @@ export default function DashboardScreen() {
       const response = await transferService.getTransferHistory(3, 0); // Load last 3 OBP transaction requests
       setRecentTransfers(response.transfers);
       setHasInitiallyLoaded(true);
-      console.log('✅ Recent transfers loaded:', response.transfers.length, 'transfers');
+      // Recent transfers loaded (log disabled for performance)
     } catch (error) {
       console.error('❌ Failed to load recent transfers:', error);
       // If it's an auth error, clear the transfers
@@ -110,7 +106,7 @@ export default function DashboardScreen() {
     }
 
     setLastAutoRefreshTime(new Date());
-    console.log('🔄 Refreshing all dashboard data...');
+    // Refreshing all dashboard data (log disabled for performance)
     
     try {
       // Refresh accounts and balance
@@ -127,7 +123,7 @@ export default function DashboardScreen() {
       // Update last refresh time
       setLastRefreshTime(new Date());
       
-      console.log('✅ Dashboard data refreshed successfully');
+      // Dashboard data refreshed successfully (log disabled for performance)
     } catch (error) {
       console.error('❌ Failed to refresh dashboard data:', error);
       
@@ -246,14 +242,20 @@ export default function DashboardScreen() {
     // 1. First, select the account (this clears the old balance)
     selectAccount(accountId);
     
-    // 2. Immediately refresh the balance for the specific account
-    // This prevents showing stale balance data from other accounts
-    await refreshBalance(accountId);
+    // 2. Only refresh balance if we don't have cached data for this account
+    const cachedBalance = getAccountBalance(accountId);
+    if (!cachedBalance) {
+      await refreshBalance(accountId);
+    }
   };
 
   useEffect(() => {
     if (selectedAccount && !balance) {
-      refreshBalance(selectedAccount.id);
+      // Add throttling to prevent rapid successive calls
+      const timeoutId = setTimeout(() => {
+        refreshBalance(selectedAccount.id);
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
   }, [selectedAccount, balance, refreshBalance]);
 
@@ -277,7 +279,7 @@ export default function DashboardScreen() {
       const { isInitialized: currentInitialized } = useWalletStore.getState();
       
       if (currentUser && currentToken && currentInitialized) {
-        console.log('📱 Dashboard screen focused - refreshing data...');
+        // Dashboard screen focused - refreshing data (log disabled for performance)
         refreshAllData(true); // Skip throttling for focus refresh
       }
     }, [refreshAllData])
@@ -301,14 +303,14 @@ export default function DashboardScreen() {
         const intervalToken = useAuthStore.getState().token;
         
         if (intervalUser && intervalToken) {
-          console.log('⏰ Auto-refreshing dashboard data (2-minute interval)...');
+          if (__DEV__) console.log('⏰ Auto-refreshing dashboard data (2-minute interval)...');
           refreshAllData();
         }
       }, 2 * 60 * 1000); // 2 minutes
 
       // Cleanup interval when screen loses focus
       return () => {
-        console.log('🛑 Stopping auto-refresh (screen unfocused)');
+        if (__DEV__) console.log('🛑 Stopping auto-refresh (screen unfocused)');
         clearInterval(autoRefreshInterval);
       };
     }, [refreshAllData])

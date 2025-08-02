@@ -104,33 +104,26 @@ export const useWalletStore = create<WalletState & WalletActions>()(
 
       loadAccounts: async () => {
         const { userId, selectedAccount } = get();
-        console.log(`🏦 Loading accounts for user: ${userId}`);
+        // Loading accounts for user (log disabled for performance)
         set({ isLoading: true, error: null });
         
         try {
           const response = await bankingService.getAccounts();
           
-          console.log(`✅ Accounts loaded:`, {
-            accountCount: response.accounts.length,
-            accounts: response.accounts.map(acc => ({
-              id: acc.id,
-              currency: acc.currency,
-              iban: acc.iban
-            }))
-          });
+          // Accounts loaded (log disabled for performance)
           
           // Preserve the currently selected account if it still exists
           let newSelectedAccount = null;
           if (selectedAccount) {
             newSelectedAccount = response.accounts.find(acc => acc.id === selectedAccount.id) || null;
-            console.log(`🔄 Preserving selected account: ${selectedAccount.currency} (${selectedAccount.id})`);
+            // Preserving selected account (log disabled for performance)
           }
           
           // If no account is selected or the previously selected account no longer exists,
           // select the first available account
           if (!newSelectedAccount && response.accounts.length > 0) {
             newSelectedAccount = response.accounts[0];
-            console.log(`🔄 Auto-selecting first account: ${newSelectedAccount.currency} (${newSelectedAccount.id})`);
+            if (__DEV__) console.log(`🔄 Auto-selecting first account: ${newSelectedAccount.currency} (${newSelectedAccount.id})`);
           }
           
           set({
@@ -181,7 +174,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           return;
         }
 
-        console.log(`🔄 Refreshing balance for account: ${targetAccountId} (user: ${userId})`);
+        // Refreshing balance for account (log disabled for performance)
         
         // Clear the current balance AND the cached balance for this account to ensure UI updates
         const updatedBalances = { ...accountBalances };
@@ -195,15 +188,10 @@ export const useWalletStore = create<WalletState & WalletActions>()(
         });
         
         try {
-          console.log(`📡 Making balance API call for account: ${targetAccountId}`);
+          // Making balance API call for account (log disabled for performance)
           const response = await bankingService.getAccountBalance(targetAccountId);
           
-          console.log(`✅ Balance refresh successful:`, {
-            accountId: targetAccountId,
-            balance: response.balance,
-            amount: response.balance.amount,
-            currency: response.balance.currency
-          });
+          // Balance refresh successful (log disabled for performance)
           
           // Update both the current balance (if this is the selected account) and the cache
           set((state) => ({
@@ -236,7 +224,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       updateAccountBalance: (accountId: string, newBalance: number) => {
         const { accounts, selectedAccount, balance } = get();
         
-        console.log(`💰 Updating account balance: ${accountId} → ${newBalance}`);
+        if (__DEV__) console.log(`💰 Updating account balance: ${accountId} → ${newBalance}`);
         
         // Update the account in the accounts list
         const updatedAccounts = accounts.map(account => 
@@ -269,7 +257,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           balance: updatedBalance
         });
         
-        console.log(`✅ Account balance updated successfully`);
+        if (__DEV__) console.log(`✅ Account balance updated successfully`);
       },
 
       getAccountBalance: (accountId: string) => {
@@ -308,7 +296,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
       setUserId: async (userId: string | null) => {
         const currentUserId = get().userId;
         if (currentUserId !== userId) {
-          console.log('Wallet: User changed, clearing all data and storage');
+          if (__DEV__) console.log('Wallet: User changed, clearing all data and storage');
           // User changed - reset all data AND clear storage
           set({
             accounts: [],
@@ -361,7 +349,7 @@ export const useWalletStore = create<WalletState & WalletActions>()(
           return;
         }
         if (state) {
-          console.log('Wallet store rehydrated with userId:', state.userId);
+          if (__DEV__) console.log('Wallet store rehydrated with userId:', state.userId);
           // Additional validation can be added here if needed
         }
       },

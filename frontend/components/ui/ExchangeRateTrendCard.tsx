@@ -249,12 +249,13 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 color={getTrendColor()}
                 thickness={2}
                 
-                // Show only today's data point using color array approach
+                // Show only today's data point - hide all others
                 hideDataPoints={false}
-                dataPointsColor={trendData.map((_, index) => {
+                dataPointsColor={getTrendColor()}
+                hideDataPoint={trendData.map((_, index) => {
                   const isToday = index === trendData.length - 1;
-                  return isToday ? getTrendColor() : 'transparent';
-                }).join(',')}
+                  return !isToday; // Hide all points except the last one (today)
+                })}
                 dataPointsRadius={6}
                 dataPointsHeight={12}
                 dataPointsWidth={12}
@@ -281,7 +282,7 @@ export const ExchangeRateTrendCard: React.FC = () => {
                 endFillColor={getTrendColor()}
                 startOpacity={0.3}
                 endOpacity={0.05}
-                backgroundColor="transparent"
+                backgroundColor="rgba(0,0,0,0)"
                 
                 // Y-axis configuration with increased range to smooth fluctuations
                 maxValue={(() => {

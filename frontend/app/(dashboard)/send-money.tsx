@@ -355,6 +355,15 @@ export default function SendMoneyScreen() {
   const getFilteredRecipients = () => {
     let filtered = recentRecipients;
 
+    // CURRENCY CONTEXT FILTERING: Only show recipients from the same currency context
+    // This prevents the cross-currency repeat transfer bug
+    const currentCurrency = selectedAccount?.currency;
+    if (currentCurrency) {
+      filtered = filtered.filter(r => r.sourceCurrency === currentCurrency);
+      console.log(`🎯 Filtering recipients by currency context: ${currentCurrency}`);
+      console.log(`📋 Filtered ${recentRecipients.length} recipients to ${filtered.length} matching currency`);
+    }
+
     // Filter by tab
     switch (activeTab) {
       case 'favorites':

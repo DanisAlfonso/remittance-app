@@ -249,6 +249,20 @@ export default function DashboardScreen() {
     }
   };
 
+  // Cards navigation handler
+  const handleCardsPress = () => {
+    if (!selectedAccount) {
+      Alert.alert('Select Account', 'Please select an account first to manage cards for that currency.');
+      return;
+    }
+
+    // Navigate to cards screen with currency parameter
+    router.push({
+      pathname: '/(dashboard)/cards',
+      params: { currency: selectedAccount.currency }
+    });
+  };
+
   useEffect(() => {
     if (selectedAccount && !balance) {
       // Add throttling to prevent rapid successive calls
@@ -491,7 +505,10 @@ export default function DashboardScreen() {
                 </Text>
               </Pressable>
               
-              <Pressable style={[styles.actionButton, styles.secondaryAction]}>
+              <Pressable 
+                style={[styles.actionButton, styles.secondaryAction]}
+                onPress={handleCardsPress}
+              >
                 <View style={[styles.actionIconContainer, styles.secondaryIconContainer]}>
                   <Ionicons name="card" size={24} color="#3B82F6" />
                 </View>

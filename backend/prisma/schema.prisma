@@ -49,6 +49,8 @@ model User {
   bankAccounts BankAccount[]
   sentInternalTransfers     InternalTransfer[] @relation("Sender")
   receivedInternalTransfers InternalTransfer[] @relation("Recipient")
+  issuedCards IssuedCard[]
+  cardTransactions CardTransaction[]
   
   
   // Performance indexes for user search
@@ -262,6 +264,52 @@ model BankAccount {
   transactions BankTransaction[]
   
   @@map("bank_accounts")
+}
+
+// Stripe Issuing Cards
+model IssuedCard {
+  id                  String   @id @default(cuid())
+  userId              String
+  stripeCardId        String   @unique
+  stripeCardholderId  String
+  currency            String   @db.VarChar(3)
+  cardType            String   // VIRTUAL, PHYSICAL
+  status              String   @default("ACTIVE") // ACTIVE, INACTIVE, CANCELLED
+  spendingLimit       Decimal  @db.Decimal(10, 2)
+  isTestCard          Boolean  @default(false)
+  design              String   @default("classic") // classic, premium, midnight, ocean
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions CardTransaction[]
+  
+  @@map("issued_cards")
+}
+
+model CardTransaction {
+  id                   String   @id @default(cuid())
+  cardId               String
+  userId               String
+  stripeAuthorizationId String?
+  stripeTransactionId  String?
+  amount               Decimal  @db.Decimal(10, 2)
+  currency             String   @db.VarChar(3)
+  merchantName         String?
+  merchantCategory     String?
+  status               String   // PENDING, APPROVED, DECLINED, COMPLETED
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  // Relations
+  card IssuedCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+  
+  @@map("card_transactions")
 }
 
 model BankTransaction {

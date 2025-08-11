@@ -9,6 +9,7 @@ import accountsRoutes from './routes/accounts';
 import obpRoutes from './routes/obp-v5';
 import usersRoutes from './routes/users';
 import remittanceRoutes from './routes/remittance';
+import cardsRoutes from './routes/cards';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -60,6 +61,9 @@ app.use('/obp/v5.1.0', obpRoutes); // Additional OBP endpoints (users/current, t
 
 // Remittance endpoints (OBP-API v5.1.0 compliant)
 app.use('/obp/v5.1.0/remittance', remittanceRoutes); // EUR → HNL remittances
+
+// Stripe Issuing Cards API
+app.use('/api/v1/cards', cardsRoutes); // Card issuance and management
 
 app.use((req, res, next) => {
   notFoundHandler(req, res);

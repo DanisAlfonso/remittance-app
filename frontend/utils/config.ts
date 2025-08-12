@@ -4,7 +4,7 @@ import type { AppConfig, Environment } from '../types';
 export function getConfig(): AppConfig {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL || 
                  Constants.expoConfig?.extra?.apiUrl || 
-                 'http://192.168.167.129:3000';
+                 'http://192.168.80.129:3000';
                  
   const appName = process.env.EXPO_PUBLIC_APP_NAME || 
                   Constants.expoConfig?.extra?.appName || 

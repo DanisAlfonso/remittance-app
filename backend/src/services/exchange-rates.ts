@@ -24,7 +24,7 @@ interface ExchangeRateError {
 }
 
 export class ExchangeRateService {
-  private readonly exchangeRateApiKey = 'c489362015b50ffea49f9bb4';
+  private readonly exchangeRateApiKey = process.env.EXCHANGE_RATE_API_KEY || 'c489362015b50ffea49f9bb4';
   private readonly exchangeRateApiUrl = 'https://v6.exchangerate-api.com/v6';
   private readonly githubApiUrl = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies';
   

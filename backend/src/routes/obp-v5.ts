@@ -40,7 +40,6 @@ const getBankAccountsHandler: RequestHandler = async (req: AuthRequest, res: Res
       return;
     }
 
-    console.log(`🏦 Getting accounts for bank ${bankId} via OBP-API...`);
     
     // Get accounts from our database that belong to this bank
     const accounts = await prisma.bankAccount.findMany({
@@ -127,7 +126,6 @@ const createBankAccountHandler: RequestHandler = async (req: AuthRequest, res: R
       user_id: userId
     });
 
-    console.log(`🏦 Creating account for bank ${bankId} via OBP-API...`);
     
     // Create account using OBP service
     const result = await obpApiService.createAccount({
@@ -223,7 +221,6 @@ const getAccountTransactionsHandler: RequestHandler = async (req: AuthRequest, r
       return;
     }
 
-    console.log(`📊 Getting transactions for account ${accountId} in bank ${bankId}...`);
     
     // For now, return empty transactions - this would be implemented later
     // when we connect to the bank_transactions table
@@ -259,28 +256,17 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
       return;
     }
 
-    console.log('📋 Getting transaction requests from database...');
-    
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
     
     // Get transaction history from master account banking service
-    console.log(`🔍 Searching for transactions for user: ${userId}`);
     const transactions = await masterAccountBanking.getTransactionHistory(userId, undefined, limit);
-    console.log(`📊 Found ${transactions.length} transactions in database for user ${userId}`);
     
     // Transform database transactions to frontend Transfer format
     const transfers = await Promise.all(transactions.map(async (tx) => {
       // Determine amount sign based on transaction type
       const amount = parseFloat(tx.amount.toString());
       let sourceAmount: number;
-      
-      console.log(`🔍 Processing transaction:`, {
-        id: tx.id,
-        type: tx.type,
-        originalAmount: amount,
-        referenceNumber: tx.referenceNumber
-      });
       
       switch (tx.type) {
         case 'OUTBOUND_TRANSFER':
@@ -297,8 +283,6 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
           sourceAmount = amount;
           break;
       }
-      
-      console.log(`✅ Final amount for transaction ${tx.id}: ${sourceAmount} (type: ${tx.type})`);
       
       // Extract recipient information from stored transaction data
       let recipientName = 'Unknown Recipient';
@@ -386,7 +370,6 @@ const getTransactionRequestsHandler: RequestHandler = async (req: AuthRequest, r
       };
     }));
     
-    console.log(`✅ Found ${transfers.length} transactions for user ${userId}`);
     
     res.json({
       transfers,
@@ -433,16 +416,11 @@ const getAccountBalanceHandler: RequestHandler = async (req: AuthRequest, res: R
       return;
     }
 
-    console.log(`💰 Getting balance for account ${accountId} for user ${userId}...`);
-    console.log(`🔍 Debug: accountId="${accountId}", userId="${userId}"`);
-    console.log(`🔍 Debug: includes '-': ${accountId.includes('-')}, startsWith userId: ${accountId.startsWith(userId)}`);
-    
     let account;
     
     // Check if accountId is in the new format (userId-currency)
     if (accountId.includes('-') && accountId.startsWith(userId)) {
-      const currency = accountId.split('-').pop(); // Get last part after splitting by '-'
-      console.log(`🔍 Looking for account with currency: ${currency}`);
+      const currency = accountId.split('-').pop(); // Get last part after splitting by '-';
       
       account = await prisma.bankAccount.findFirst({
         where: { 
@@ -522,7 +500,6 @@ const getCurrentUserHandler: RequestHandler = async (req: AuthRequest, res: Resp
       return;
     }
 
-    console.log(`👤 Getting current user details for ${userId}...`);
     
     // Get user from database
     const user = await prisma.user.findUnique({
@@ -634,7 +611,6 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
     };
 
     // 🔍 PRIORITY CHECK: Is this an internal transfer? (skip OBP-API for internal transfers)
-    console.log(`🔍 Checking if IBAN ${transferData.recipientAccount.iban} is an internal transfer...`);
     
     // Step 1: Find the recipient user by IBAN (any currency)
     const recipientUserAccount = await prisma.bankAccount.findFirst({
@@ -656,9 +632,7 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
     });
 
     if (!recipientUserAccount) {
-      console.log(`🌐 External transfer: IBAN ${transferData.recipientAccount.iban} is not an app user`);
     } else {
-      console.log(`👤 Found app user: ${recipientUserAccount.user.firstName} ${recipientUserAccount.user.lastName} (${recipientUserAccount.user.email})`);
       
       // Step 2: Check if this user has an account in the correct currency
       const recipientCurrencyAccount = await prisma.bankAccount.findFirst({
@@ -671,7 +645,6 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
       });
 
       if (!recipientCurrencyAccount) {
-        console.log(`🔧 User ${recipientUserAccount.user.firstName} doesn't have a ${transferData.transferDetails.currency} account. Auto-creating...`);
         
         // Step 3: Auto-create the currency account for the recipient
         try {
@@ -681,7 +654,6 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
             transferData.transferDetails.currency as 'EUR' | 'HNL',
             `${transferData.transferDetails.currency} Account`
           );
-          console.log(`✅ Auto-created ${transferData.transferDetails.currency} account for user ${recipientUserAccount.user.firstName}`);
         } catch (createError) {
           console.error(`❌ Failed to auto-create ${transferData.transferDetails.currency} account:`, createError);
           res.status(500).json({
@@ -715,7 +687,7 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
 
     if (recipientAccount) {
       // 💫 INTERNAL TRANSFER: Route directly to internal banking system
-      console.log(`💫 Internal transfer detected: ${transferData.recipientAccount.iban} belongs to ${recipientAccount.user.firstName} ${recipientAccount.user.lastName}`);
+      ;
       console.log(`💫 Skipping OBP-API and processing internally: ${userId} → ${recipientAccount.userId} (${transferData.transferDetails.amount} ${transferData.transferDetails.currency})`);
       
       try {
@@ -828,7 +800,6 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
     }
 
     // 🌐 EXTERNAL TRANSFER: Continue with OBP-API for external recipients
-    console.log(`🌐 External transfer: ${transferData.recipientAccount.iban} is not an app user, proceeding with OBP-API...`);
     
     // Call real OBP-API service
     const result = await obpApiService.createTransactionRequest(obpRequestData);
@@ -867,7 +838,6 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
           console.log('✅ masterAccountBanking service imported successfully');
           
           // Check if this is an internal transfer (recipient IBAN belongs to an app user)
-          console.log(`🔍 Checking if IBAN ${transferData.recipientAccount.iban} belongs to an app user...`);
           console.log('🔍 Database query: Looking for bankAccount with IBAN, status=ACTIVE, type=virtual_remittance');
           
           const recipientAccount = await prisma.bankAccount.findFirst({
@@ -902,7 +872,7 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
 
           if (recipientAccount) {
             // INTERNAL TRANSFER: Both users are in the app
-            console.log(`💫 Internal transfer detected: ${transferData.recipientAccount.iban} belongs to ${recipientAccount.user.firstName} ${recipientAccount.user.lastName}`);
+            ;
             console.log(`💫 Transfer details: ${userId} → ${recipientAccount.userId} (${transferData.transferDetails.amount} ${transferData.transferDetails.currency})`);
             
             try {
@@ -1012,7 +982,6 @@ const createTransactionRequestHandler: RequestHandler = async (req: AuthRequest,
             }
           } else {
             // EXTERNAL TRANSFER: Recipient is outside the app
-            console.log(`🌐 External transfer: ${transferData.recipientAccount.iban} is external`);
             
             internalResult = await masterAccountBanking.executeOutboundTransfer({
               fromUserId: userId,

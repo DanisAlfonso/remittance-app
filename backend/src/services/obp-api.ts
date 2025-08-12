@@ -63,11 +63,6 @@ export class OBPApiService {
       password: env.OBP_PASSWORD,
     };
     
-    // Debug: Log what credentials we're actually using
-    console.log(`🔧 [OBP-CONFIG] Consumer Key: ${this.config.consumerKey}`);
-    console.log(`🔧 [OBP-CONFIG] Username: ${this.config.username}`);
-    console.log(`🔧 [OBP-CONFIG] Base URL: ${this.config.baseUrl}`);
-    console.log(`🔧 [OBP-CONFIG] Environment loading check: OBP_CONSUMER_KEY=${process.env.OBP_CONSUMER_KEY ? 'LOADED' : 'MISSING'}`);
   }
 
   /**

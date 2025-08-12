@@ -78,7 +78,6 @@ async function startServer() {
       console.log(`🚀 Server is running on port ${env.PORT}`);
       console.log(`📊 Environment: ${env.NODE_ENV}`);
       console.log(`🔗 Health check: http://localhost:${env.PORT}/health`);
-      console.log(`🌐 Network access: http://192.168.148.129:${env.PORT}/health`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

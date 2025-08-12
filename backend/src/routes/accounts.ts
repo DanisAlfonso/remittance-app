@@ -23,11 +23,9 @@ const getUserAccountsHandler: RequestHandler = async (req: AuthRequest, res: Res
       return;
     }
 
-    console.log(`🔍 Getting virtual accounts for user ${userId}`);
     
     const virtualAccounts = await masterAccountBanking.getUserAccountBalances(userId);
     
-    console.log(`✅ Found ${virtualAccounts.length} virtual accounts for user ${userId}`);
     
     res.json({
       message: 'Accounts retrieved successfully',
@@ -81,7 +79,6 @@ const createVirtualAccountHandler: RequestHandler = async (req: AuthRequest, res
 
     const validatedData = createVirtualAccountSchema.parse(req.body);
     
-    console.log(`🏦 Creating additional ${validatedData.currency} virtual account for user ${userId}`);
     
     const virtualAccount = await masterAccountBanking.createVirtualAccount(
       userId,
@@ -89,7 +86,6 @@ const createVirtualAccountHandler: RequestHandler = async (req: AuthRequest, res
       validatedData.accountLabel
     );
     
-    console.log(`✅ Created ${validatedData.currency} virtual account with IBAN: ${virtualAccount.virtualIBAN}`);
     
     res.status(201).json({
       message: 'Virtual account created successfully',
@@ -145,7 +141,6 @@ const getTransactionHistoryHandler: RequestHandler = async (req: AuthRequest, re
 
     const validatedQuery = getTransactionHistorySchema.parse(req.query);
     
-    console.log(`📊 Getting transaction history for user ${userId}`);
     
     const transactions = await masterAccountBanking.getTransactionHistory(
       userId,
@@ -153,7 +148,6 @@ const getTransactionHistoryHandler: RequestHandler = async (req: AuthRequest, re
       validatedQuery.limit
     );
     
-    console.log(`✅ Found ${transactions.length} transactions for user ${userId}`);
     
     res.json({
       message: 'Transaction history retrieved successfully',

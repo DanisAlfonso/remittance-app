@@ -1,32 +1,50 @@
-# Backend Scripts
+# Backend Scripts Directory
 
-This folder contains utility scripts for development, testing, and maintenance.
+This directory contains all scripts for managing the remittance app backend infrastructure.
 
-## Structure
+## 📁 Directory Structure
 
-### `/development/`
-Contains scripts useful for ongoing development and debugging:
-- Account verification scripts
-- Currency testing utilities
-- Exchange rate management
-- Development helpers
+### `/production/` - Production Operations
+- `deploy-production-migrations.sh` - Safe production database migrations
+- `create-database-backup.sh` - Automated database backup with integrity verification
 
-### `/archive/`
-Contains one-time setup scripts that were used during initial development:
-- Historical account creation scripts
-- Experimental implementations
-- Debugging scripts from specific issues
+### `/setup/` - One-time Setup Scripts
+- `setup-complete-obp.sh` - Complete OBP-API setup (banks, accounts, permissions)
+- `fund-master-accounts.sh` - Fund EURBANK master account for transfers
+- `test-obp-setup.sh` - Verify OBP-API connectivity and configuration
 
-## Usage
+### `/maintenance/` - Database & System Maintenance
+- `check-user-balance.js` - Debug user account balances and transactions
+- `check-obp-accounts.sh` - Verify OBP-API accounts and balances
+- `clear-users.sql` - Development database cleanup (⚠️ destructive)
 
-Run scripts from the backend directory:
+### `/development/` - Development Utilities
+- Various TypeScript scripts for testing specific features
+- Safe to experiment and modify during development
+
+### `/archive/` - Historical Scripts
+- Legacy scripts kept for reference
+- Not used in current development
+
+## 🚀 Usage Examples
+
 ```bash
-cd backend
-npx tsx scripts/development/script-name.ts
+# Setup new environment
+./setup/setup-complete-obp.sh
+./setup/fund-master-accounts.sh
+
+# Production deployment
+./production/deploy-production-migrations.sh
+./production/create-database-backup.sh
+
+# Development debugging
+node maintenance/check-user-balance.js
+./maintenance/check-obp-accounts.sh
 ```
 
-## Important Notes
+## 🔒 Security Notes
 
-- These scripts use the same OBP-API configuration as the main application
-- Always verify script behavior in development before running in production
-- Scripts may modify account balances and create test data
+- All scripts contain sensitive credentials from CLAUDE.md
+- Never commit real production credentials to git
+- Scripts are designed for development/staging environments
+- Production scripts require explicit confirmation prompts
